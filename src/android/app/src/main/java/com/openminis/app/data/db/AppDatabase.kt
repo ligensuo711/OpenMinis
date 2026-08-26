@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WebAppShortcutEntity::class,
         FolderEntity::class,
     ],
-    version = 12,
+    version = 13,
     // [T-android-downgrade-compat] Kept ON so MigrationTestHelper and CI can
     // validate every migration (and its downgrade counterpart) against the
     // committed schema json. Without it the upgrade/downgrade chain has no
@@ -253,6 +253,25 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * [T-session-branching] Session branch comparison (stage 3.3).
+         * Upstream 1.13 took 12 for the token-attribution columns, so our
+         * branching migration is renumbered 12 → 13 (was 11 → 12 in the
+         * 1.12 fork). Adds `messages.parent_id` + `messages.branch_id`,
+         * both nullable. Purely additive: existing rows read back NULL
+         * (trunk). Idempotent on purpose — Room runs migrations outside a
+         * transaction, so a prior failed run may already have persisted
+         * the DDL; guard the ALTERs, CREATE INDEX is already IF NOT EXISTS.
+         */
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN parent_id TEXT") }
+                runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN branch_id TEXT") }
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_parent_id ON messages(parent_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_branch_id ON messages(branch_id)")
+            }
+        }
+
+        /**
          * [T-android-downgrade-compat] Downgrade 12 → 11. Deliberately a NO-OP.
          *
          * ## Why this exists
@@ -321,7 +340,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                        MIGRATION_11_12, MIGRATION_12_11,
+                        MIGRATION_11_12, MIGRATION_12_11, MIGRATION_12_13,
                     )
                     .build()
                     .also { INSTANCE = it }

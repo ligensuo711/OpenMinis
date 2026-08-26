@@ -16,7 +16,16 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         )
     ],
-    indices = [Index(value = ["session_id", "sort_order"])]
+    indices = [
+        Index(value = ["session_id", "sort_order"]),
+        // [T-session-branching] Branch lookup indexes. Names MUST match the
+        // CREATE INDEX statements in MIGRATION_11_12 — Room validates the
+        // entity's declared indices against the live DB on open, and a name
+        // or missing-entry mismatch here throws "Migration didn't properly
+        // handle" at startup.
+        Index(value = ["parent_id"], name = "index_messages_parent_id"),
+        Index(value = ["branch_id"], name = "index_messages_branch_id"),
+    ]
 )
 data class MessageEntity(
     @PrimaryKey val id: String,
