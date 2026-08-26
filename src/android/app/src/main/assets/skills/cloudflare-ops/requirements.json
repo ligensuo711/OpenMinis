@@ -1,0 +1,13 @@
+{
+  "apk": ["curl"],
+  "pip": [],
+  "env": {
+    "CF_API_TOKEN": "Tier 2 - 部署 Worker、管理 KV/R2/DNS（需读写 scope）",
+    "CF_ACCOUNT_ID": "Tier 2 - 账户级操作需 Account ID"
+  },
+  "tiers": {
+    "0": "暂无可用能力（未配置 CF_API_TOKEN）",
+    "1": "列 Zones、查 DNS（仅 CF_API_TOKEN；账户级资源需 CF_ACCOUNT_ID）",
+    "2": "部署 Worker、管理 KV/R2/DNS/Zone（CF_API_TOKEN + CF_ACCOUNT_ID）"
+  }
+}

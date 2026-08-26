@@ -10049,6 +10049,190 @@ class ChatViewModel(
         return entity.id
     }
 
+    // ─── GitHub 平台集成（内置技能能力判级） ─────────────────────────────
+
+    /**
+     * Build the "## 内置集成" prompt fragment: bundled platform skills with
+     * their *current* capability tier, derived from each skill's
+     * `requirements.json` + the app's env config (which token is configured).
+     *
+     * Tells the model what it can actually do right now — so it never needs
+     * to guess from trial-and-error whether a token is configured before
+     * attempting an operation. Returns null when no bundled platform skill
+     * applies to this session.
+     */
+    private fun buildIntegrationStatus(): String? {
+        val repo = skillRepository ?: return null
+        val platformIds = listOf("github-ops", "cloudflare-ops")
+        val rows = mutableListOf<String>()
+
+        for (id in platformIds) {
+            val skill = repo.skills.value.find { it.id == id } ?: continue
+            if (!repo.isEnabledForSession(id, activeSessionId)) continue
+            val reqs = repo.loadSkillRequirements(id) ?: continue
+            val declaredVars = reqs.env.keys
+            val configuredVars = envVarsSnapshot().keys
+            val tier = com.openminis.app.data.SkillIntegrationTier.resolve(declaredVars, configuredVars)
+            val foundVars = declaredVars.intersect(configuredVars)
+            // A platform is only "available" if it defines an explicit
+            // capability description for its current tier. If the tier key
+            // is absent (e.g. no entry for "0"), the platform has no
+            // capability at that tier — don't label it "zero-config usable".
+            val ops = reqs.tiers[tier.toString()]
+            // Diagnostic: surface exactly which declared env vars were found
+            // in the store at prompt-build time, so a "以为配了却显示需配置"
+            // mismatch is greppable in logcat instead of being a silent guess.
+            AppLogger.info(
+                TAG,
+                "[IntegrationStatus] ${skill.name}: tier=$tier " +
+                    "declared=${declaredVars.sorted()} found=${foundVars.sorted()} " +
+                    "hasCapability=${ops != null} enabled=${repo.isEnabledForSession(id, activeSessionId)}"
+            )
+            if (ops == null) {
+                // No capability described for this tier → no free tier.
+                rows.add("| ${skill.name} | 🔒 需配置 | 暂无可用能力（未定义 Tier $tier 能力） |")
+                continue
+            }
+            val status = when (tier) {
+                2 -> "✅ 完整"
+                1 -> "⚠️ 只读"
+                else -> "⚡ 零配置"
+            }
+            rows.add("| ${skill.name} | $status | $ops |")
+        }
+
+        if (rows.isEmpty()) return null
+
+        return buildString {
+            append("## 内置集成\n\n")
+            append("以下平台技能已内置，无需手动安装。Tier 0 零配置即可使用；Tier 1/2 需配置对应环境变量（Settings → Environments 或 minis-config envvars）。\n\n")
+            append("| 集成 | 状态 | 可用操作 |\n")
+            append("|------|------|--------|\n")
+            rows.forEach { append(it).append("\n") }
+            append("\n")
+            append("使用涉及环境变量的操作前，请先检查对应变量是否已设置。")
+        }
+    }
+
+    /**
+     * Read the current environment-variable store as a snapshot map.
+     * Queries [EnvVarRepository] which is the same encrypted store the
+     * sandbox injects. Only keys with a non-null stored value are returned —
+     * configured-but-blank vars don't count as present. Values are read
+     * internally by the repo but never surfaced outside the tier check (we
+     * only test `containsKey`).
+     */
+    private fun envVarsSnapshot(): Map<String, String> =
+        try {
+            EnvVarRepository(context).allAsDict()
+        } catch (e: Exception) {
+            Log.w(TAG, "envVarsSnapshot: ${e.message}")
+            emptyMap()
+        }
+
+    // [T-session-branching] Stage 3.3 — branch comparison across two models.
+    // Runs two non-streaming completions in parallel for the same prompt and
+    // stores each answer as a branch off the current tail. The compare sheet
+    // then lets the user keep one; promotion re-parents that branch to trunk.
+    fun startBranchCompare(prompt: String) {
+        if (prompt.isBlank()) return
+        viewModelScope.launch {
+            _branchCompareRunning.value = true
+            try {
+                runBranchCompare(prompt)
+            } catch (t: Throwable) {
+                _error.value = "Compare failed: ${t.message}"
+            } finally {
+                _branchCompareRunning.value = false
+            }
+        }
+    }
+
+    fun dismissBranchCompare() {
+        _branchCompare.value = null
+    }
+
+    private suspend fun runBranchCompare(prompt: String) {
+        val entries = providerRepository.allVisibleEntries().filter { entry ->
+            val inst = providerRepository.instance(entry.providerInstanceId) ?: return@filter false
+            providerRepository.usableApiKey(inst) != null
+        }
+        if (entries.size < 2) {
+            _error.value = "Configure at least two models to compare"
+            return
+        }
+        val currentId = _activeEntryId.value
+        val entryA = entries.firstOrNull { it.id == currentId } ?: entries[0]
+        val entryB = entries.firstOrNull { it.id != entryA.id } ?: return
+
+        val providerA = buildProviderForEntry(entryA) ?: return
+        val providerB = buildProviderForEntry(entryB) ?: return
+
+        val sys = buildSystemPrompt()
+        val history = effectiveAgentHistory() + LLMMessage(LLMMessage.Role.USER, prompt)
+        val maxTok = dynamicMaxTokens(providerA)
+
+        val (respA, respB) = coroutineScope {
+            val da = async(Dispatchers.IO) { runCatching { providerA.sendMessage(history, sys, maxTok) } }
+            val db = async(Dispatchers.IO) { runCatching { providerB.sendMessage(history, sys, maxTok) } }
+            da.await() to db.await()
+        }
+
+        val textA = respA.getOrNull()?.text ?: "Error: ${respA.exceptionOrNull()?.message}"
+        val textB = respB.getOrNull()?.text ?: "Error: ${respB.exceptionOrNull()?.message}"
+
+        val forkPoint = _messages.value.lastOrNull()?.sourceDbIds?.lastOrNull()
+        val branchAId = UUID.randomUUID().toString()
+        val branchBId = UUID.randomUUID().toString()
+        val sid = realSessionId.ifEmpty { sessionId }
+        val partsA = """[{"type":"text","value":${escapeJson(textA)}}]"""
+        val partsB = """[{"type":"text","value":${escapeJson(textB)}}]"""
+        chatRepository.appendMessage(sid, "assistant", partsA, parentId = forkPoint, branchId = branchAId)
+        chatRepository.appendMessage(sid, "assistant", partsB, parentId = forkPoint, branchId = branchBId)
+
+        _branchCompare.value = BranchCompareState(
+            forkPointId = forkPoint,
+            answerA = BranchAnswer(branchAId, entryA.model.displayName, textA),
+            answerB = BranchAnswer(branchBId, entryB.model.displayName, textB),
+        )
+    }
+
+    private fun buildProviderForEntry(entry: ModelEntry): LLMProvider? {
+        val inst = providerRepository.instance(entry.providerInstanceId) ?: return null
+        val key = providerRepository.usableApiKey(inst) ?: return null
+        return ProviderFactory.create(inst, key, entry.model, context)
+    }
+
+    /**
+     * [T-session-branching] Keep one alternative answer: promote its rows to
+     * the trunk (clearing parent_id/branch_id) and reload so the kept answer
+     * shows in the normal chat stream. The rejected alternative stays parked
+     * (still visible only in the compare view). Mirrors RikkaHub's
+     * "pick a branch to continue".
+     */
+    fun keepBranch(branchId: String) {
+        viewModelScope.launch {
+            val sid = realSessionId.ifEmpty { sessionId }
+            val rows = chatRepository.loadMessages(sid)
+            val plan = BranchGraph.promotionPlan(
+                rows.map {
+                    BranchGraph.Row(
+                        id = it.id,
+                        parentId = it.parentId,
+                        branchId = it.branchId,
+                        role = it.role,
+                        summary = "",
+                        sortOrder = it.sortOrder,
+                    )
+                },
+                branchId,
+            )
+            chatRepository.promoteBranchMessages(plan)
+            _branchCompare.value = null
+            reloadSessionFromDb()
+        }
+    }
+
     private fun buildSystemPrompt(): String? {
         // Cache-friendly layout: keep `base` byte-stable by stripping out anything
         // that varies per request, then append a "Runtime context" suffix at the
