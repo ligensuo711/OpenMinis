@@ -877,6 +877,12 @@ fun ChatScreen(
     // [T-mcp-integration-android] MCPs-in-Session sheet visibility.
     var showMcpsSheet by remember { mutableStateOf(false) }
     var showTokenUsageSheet by remember { mutableStateOf(false) }
+    // [T-tool-timeline] Tool-timeline sheet visibility (stage 3.1).
+    var showToolTimeline by remember { mutableStateOf(false) }
+    // [T-session-branching] Branch compare sheet visibility (stage 3.3).
+    var showBranchCompare by remember { mutableStateOf(false) }
+    // [T-cross-validation] Cross-check sheet visibility (stage 4.12).
+    var showCrossValidation by remember { mutableStateOf(false) }
     // T185: Move-to-session sheet visibility. Hoisted to the top of
     // ChatScreen so the trigger (capsule inside the composer) and the
     // sheet body (rendered later in the layout tree) share the same
@@ -2995,6 +3001,51 @@ fun ChatScreen(
                                 },
                                 leadingIcon = {
                                     Icon(Icons.Default.DataUsage, contentDescription = null)
+                                },
+                            )
+                            // [T-tool-timeline] Tool Timeline (stage 3.1)
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.chat_menu_tool_timeline)) },
+                                onClick = {
+                                    showChatMenu = false
+                                    showToolTimeline = true
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Schedule, contentDescription = null)
+                                },
+                            )
+                            // [T-session-branching] Branch compare (stage 3.3)
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.chat_menu_branch_compare)) },
+                                onClick = {
+                                    showChatMenu = false
+                                    val prompt = viewModel.inputText.value.ifBlank {
+                                        viewModel.messages.value.lastOrNull { it.role == "user" }?.content ?: ""
+                                    }
+                                    if (prompt.isNotBlank()) {
+                                        viewModel.startBranchCompare(prompt)
+                                        showBranchCompare = true
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.AccountTree, contentDescription = null)
+                                },
+                            )
+                            // [T-cross-validation] Cross-check (stage 4.12)
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.chat_menu_cross_check)) },
+                                onClick = {
+                                    showChatMenu = false
+                                    val prompt = viewModel.inputText.value.ifBlank {
+                                        viewModel.messages.value.lastOrNull { it.role == "user" }?.content ?: ""
+                                    }
+                                    if (prompt.isNotBlank()) {
+                                        viewModel.startCrossValidation(prompt)
+                                        showCrossValidation = true
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
                                 },
                             )
                             // Enhanced Cache (iOS parity, commit 57aaf122):
@@ -6803,6 +6854,34 @@ fun ChatScreen(
         TokenUsageSheet(
             viewModel = viewModel,
             onDismiss = { showTokenUsageSheet = false },
+        )
+    }
+
+    // [T-tool-timeline] Tool timeline bottom sheet (stage 3.1).
+    if (showToolTimeline) {
+        ToolTimelineSheet(
+            messages = viewModel.messages,
+            onDismiss = { showToolTimeline = false },
+        )
+    }
+
+    // [T-session-branching] Branch compare bottom sheet (stage 3.3).
+    if (showBranchCompare) {
+        BranchCompareSheet(
+            state = viewModel.branchCompare,
+            running = viewModel.branchCompareRunning,
+            onKeep = { branchId -> viewModel.keepBranch(branchId) },
+            onDismiss = { showBranchCompare = false },
+        )
+    }
+
+    // [T-cross-validation] Cross-check bottom sheet (stage 4.12).
+    if (showCrossValidation) {
+        CrossValidationSheet(
+            state = viewModel.crossValidation,
+            running = viewModel.crossValidationRunning,
+            onAdopt = { text -> viewModel.adoptCrossValidation(text) },
+            onDismiss = { showCrossValidation = false },
         )
     }
 

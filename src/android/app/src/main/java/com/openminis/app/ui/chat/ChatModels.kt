@@ -274,3 +274,34 @@ data class AssistantBlock(
 ) {
     val isText: Boolean get() = kind == "text"
 }
+
+// [T-session-branching] Stage 3.3 — session branch comparison.
+
+/** One alternative answer produced by a model during a compare run. */
+data class BranchAnswer(
+    val branchId: String,
+    val modelName: String,
+    val text: String,
+)
+
+/** Live compare result surfaced to the BranchCompareSheet UI. */
+data class BranchCompareState(
+    /** The message id the alternatives fork off (null = no prior message). */
+    val forkPointId: String?,
+    val answerA: BranchAnswer,
+    val answerB: BranchAnswer,
+)
+
+// [T-cross-validation] Stage 4.12 — multi-model cross-validation.
+
+/** One model's answer to the cross-checked prompt. */
+data class CrossValidationAnswer(
+    val modelName: String,
+    val text: String,
+)
+
+/** Live cross-validation result surfaced to the sheet (not persisted). */
+data class CrossValidationState(
+    val prompt: String,
+    val answers: List<CrossValidationAnswer>,
+)

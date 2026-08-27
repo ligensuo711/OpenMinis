@@ -493,6 +493,20 @@ class ChatViewModel(
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
+    // [T-session-branching] Stage 3.3 — live compare result for the branch
+    // compare sheet. Null when no compare is in flight / shown.
+    private val _branchCompare = MutableStateFlow<BranchCompareState?>(null)
+    val branchCompare: StateFlow<BranchCompareState?> = _branchCompare.asStateFlow()
+    private val _branchCompareRunning = MutableStateFlow(false)
+    val branchCompareRunning: StateFlow<Boolean> = _branchCompareRunning.asStateFlow()
+
+    // [T-cross-validation] Stage 4.12 — live cross-validation result (not
+    // persisted). Null when none in flight / shown.
+    private val _crossValidation = MutableStateFlow<CrossValidationState?>(null)
+    val crossValidation: StateFlow<CrossValidationState?> = _crossValidation.asStateFlow()
+    private val _crossValidationRunning = MutableStateFlow(false)
+    val crossValidationRunning: StateFlow<Boolean> = _crossValidationRunning.asStateFlow()
+
     // ── Long-session window cap ────────────────────────────────────────
     //
     // [T-android-larky-longsession-followup] On sessions with hundreds of
@@ -10201,6 +10215,83 @@ class ChatViewModel(
         val inst = providerRepository.instance(entry.providerInstanceId) ?: return null
         val key = providerRepository.usableApiKey(inst) ?: return null
         return ProviderFactory.create(inst, key, entry.model, context)
+    }
+
+    // [T-cross-validation] Stage 4.12 — multi-model cross-validation.
+    // Runs the same prompt through up-to-3 distinct models in parallel and
+    // surfaces the answers (NOT persisted) so the user can compare and, if
+    // they want, adopt one into the conversation.
+    fun startCrossValidation(prompt: String) {
+        if (prompt.isBlank()) return
+        viewModelScope.launch {
+            _crossValidationRunning.value = true
+            try {
+                runCrossValidation(prompt)
+            } catch (t: Throwable) {
+                _error.value = "Cross-check failed: ${t.message}"
+            } finally {
+                _crossValidationRunning.value = false
+            }
+        }
+    }
+
+    fun dismissCrossValidation() {
+        _crossValidation.value = null
+    }
+
+    /** Adopt one cross-checked answer as a normal assistant turn. */
+    fun adoptCrossValidation(text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            val sid = realSessionId.ifEmpty { sessionId }
+            val parts = """[{"type":"text","value":${escapeJson(text)}}]"""
+            chatRepository.appendMessage(sid, "assistant", parts)
+            _crossValidation.value = null
+            reloadSessionFromDb()
+        }
+    }
+
+    private suspend fun runCrossValidation(prompt: String) {
+        val entries = providerRepository.allVisibleEntries().filter { entry ->
+            val inst = providerRepository.instance(entry.providerInstanceId) ?: return@filter false
+            providerRepository.usableApiKey(inst) != null
+        }
+        if (entries.isEmpty()) {
+            _error.value = "No configured model to cross-check"
+            return
+        }
+        // Prefer the active entry, then fill with distinct-model entries up to 3.
+        val currentId = _activeEntryId.value
+        val picked = ArrayList<ModelEntry>(3)
+        entries.firstOrNull { it.id == currentId }?.let { picked.add(it) }
+        for (e in entries) {
+            if (picked.size >= 3) break
+            if (picked.none { it.model.id == e.model.id }) picked.add(e)
+        }
+        if (picked.isEmpty()) picked.add(entries[0])
+
+        val providers = picked.mapNotNull { buildProviderForEntry(it) }
+        if (providers.isEmpty()) return
+
+        val sys = buildSystemPrompt()
+        val history = effectiveAgentHistory() + LLMMessage(LLMMessage.Role.USER, prompt)
+        val maxTok = dynamicMaxTokens(providers[0])
+
+        val responses = coroutineScope {
+            providers.map { p ->
+                async(Dispatchers.IO) { runCatching { p.sendMessage(history, sys, maxTok) } }
+            }.map { it.await() }
+        }
+
+        val answers = picked.indices.map { i ->
+            CrossValidationAnswer(
+                modelName = picked[i].model.displayName,
+                text = responses[i].getOrNull()?.text
+                    ?: "Error: ${responses[i].exceptionOrNull()?.message}",
+            )
+        }
+
+        _crossValidation.value = CrossValidationState(prompt = prompt, answers = answers)
     }
 
     /**
