@@ -6,6 +6,7 @@ package com.openminis.app.ui.chat
 // LazyRevealToolText, EditorCard. Full import block copied (unused=warnings).
 // Externally-called ones are internal; cluster-only ones stay private.
 
+import com.openminis.app.ui.theme.SemanticColors
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -556,7 +557,7 @@ internal fun ToolDetailSheet(
                                                 text = linkified,
                                                 fontSize = 13.sp,
                                                 fontFamily = FontFamily.Monospace,
-                                                color = Color(0xFF34C759),  // iOS .green
+                                                color = SemanticColors.success,  // iOS .green
                                                 lineHeight = 18.sp,
                                             )
                                         }
@@ -583,14 +584,14 @@ internal fun ToolDetailSheet(
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF34C759),  // iOS .green
+                                            color = SemanticColors.success,  // iOS .green
                                         )
                                         Text(
                                             text = sheetMonitor.formattedMem(),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             fontFamily = FontFamily.Monospace,
-                                            color = Color(0xFF34C759),
+                                            color = SemanticColors.success,
                                         )
                                     }
                                 }
@@ -674,7 +675,7 @@ internal fun ToolDetailSheet(
                                     Icon(
                                         Icons.Default.EditNote,
                                         contentDescription = null,
-                                        tint = Color(0xFFFF9500),
+                                        tint = SemanticColors.warning,
                                         modifier = Modifier.size(12.dp),
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -896,7 +897,7 @@ internal fun ToolDetailSheet(
                                             fontWeight = FontWeight.SemiBold,
                                             color = Color.White,
                                             modifier = Modifier
-                                                .background(Color(0xFF007AFF), CircleShape)
+                                                .background(SemanticColors.accent, CircleShape)
                                                 .padding(horizontal = 10.dp, vertical = 2.dp),
                                         )
                                     }
@@ -1269,7 +1270,7 @@ internal fun ToolDetailSheet(
                             Box(
                                 modifier = Modifier
                                     .size(7.dp)
-                                    .background(Color(0xFF34C759), CircleShape),
+                                    .background(SemanticColors.success, CircleShape),
                             )
                             Text(
                                 "Live",
@@ -1594,7 +1595,7 @@ private fun EditorCard(
                     Text(
                         text = if (isStreaming) "($sizeLabel received)" else "($sizeLabel)",
                         fontSize = 11.sp,
-                        color = if (isStreaming) Color(0xFFFF9500).copy(alpha = 0.8f) else sizeColor,
+                        color = if (isStreaming) SemanticColors.warning.copy(alpha = 0.8f) else sizeColor,
                     )
                 }
             }

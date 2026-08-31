@@ -496,6 +496,38 @@ class ChatViewModel(
     internal val selfImprovementStore =
         com.openminis.app.agent.SelfImprovementStore.get(context)
 
+    /**
+     * [T-stage5-dropzone-visibility] Stage 5.1 — 由 buildSystemPrompt 暂存、
+     * 发送流 flush 的 dropzone 报告。appendSystemInfo 在 IO 协程里跑也可
+     * （内部只做 _messages.value 更新，无 @Composable），但更新顺序必须
+     * 在流开始前，否则系统通知会夹进流式块中间。
+     */
+    @Volatile
+    private var pendingDropzoneNotice:
+        com.openminis.app.data.repository.SkillRepository.DropzoneReport? = null
+
+    /** 消费 [pendingDropzoneNotice]，转成聊天流系统通知。 */
+    private fun flushDropzoneNoticeIfNeeded() {
+        val report = pendingDropzoneNotice ?: return
+        pendingDropzoneNotice = null
+        if (!report.hasActivity) return
+        val lines = buildList {
+            if (report.importedZips.isNotEmpty()) {
+                add("Skill pack imported: " + report.importedZips.joinToString(", "))
+            }
+            if (report.adoptedDirs.isNotEmpty()) {
+                add("Skill folder adopted: " + report.adoptedDirs.joinToString(", "))
+            }
+            if (report.failed.isNotEmpty()) {
+                add("Skill import failed (moved to skills-inbox/failed/): " +
+                    report.failed.joinToString(", "))
+            }
+        }
+        if (lines.isNotEmpty()) {
+            appendSystemInfo(lines.joinToString("\n"), "skill")
+        }
+    }
+
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -7385,6 +7417,10 @@ class ChatViewModel(
         fallbackStrategy: com.openminis.app.data.model.FallbackStrategy = com.openminis.app.data.model.FallbackStrategy.default,
     ) {
         AppLogger.info(TAG_STREAM, "runAgentLoop ENTER provider=${provider.javaClass.simpleName} historySize=${agentHistory.size}")
+        // [T-stage5-dropzone-visibility] 发送流已开始：此刻把 dropzone 导入
+        // 结果（若有）作为系统通知插入聊天流。放在任何流式内容之前，通知
+        // 不会夹进本轮的 assistant 消息块。
+        flushDropzoneNoticeIfNeeded()
         // [T-android-mem-probe-trust] Send-path context shape. The existing
         // `messages-shape` probe only runs on session LOAD, so the 2026-08-15
         // log described the session as it was opened, never as it was sent —
@@ -10371,6 +10407,23 @@ class ChatViewModel(
     }
 
     private fun buildSystemPrompt(): String? {
+        // [T-stage5-dropzone-visibility] Stage 5.1 UI 反馈闭环：buildSystemPrompt
+        // 是每轮发送的必经点，dropzone 处理在这里跑；有导入活动时把报告暂存
+        // 到 pendingDropzoneNotice，由 runAgentLoop 的调用方（发送流已在 UI
+        // 上下文）在流开始前转成 appendSystemInfo 聊天流通知——用户丢进
+        // skills-inbox 的技能包不再是「静默导入、只有 logcat 知道」。
+        // 注意 appendSystemInfo 不能在这里直接调：buildSystemPrompt 也被
+        // drainQueuedPrompts / resumeQueueAfterCancel / rerun 等路径复用，
+        // 在非 UI 时机改 _messages 会与流式更新竞争。
+        runCatching { skillRepository?.processDropzone() }
+            .onSuccess { report ->
+                if (report != null && report.hasActivity) {
+                    pendingDropzoneNotice = report
+                }
+            }
+            .onFailure {
+                AppLogger.warning(TAG, "[Dropzone] processing failed (ignored): ${it.message}")
+            }
         // Cache-friendly layout: keep `base` byte-stable by stripping out anything
         // that varies per request, then append a "Runtime context" suffix at the
         // very end with all the dynamic bits (date, timezone, locale, configured
@@ -10539,16 +10592,9 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // the file_write hook below) becomes visible on the very next user
         // turn instead of "after kill app". Cheap: loadAll is a SQLite
         // SELECT + listFiles, no network.
-        // [T-stage5-plugin-dropzone] Hot-load pass BEFORE the rescan: anything
-        // the user/agent dropped into minis-global/skills-inbox/ (zip 或含
-        // SKILL.md 的目录) is imported right here, so the fragment below —
-        // built from the same loadAll the import feeds — already sees it.
-        // runCatching: 收件箱是外部输入（坏 zip / 半拷贝目录），处理失败
-        // 绝不能打断本轮对话的 prompt 构建。
-        runCatching { skillRepository?.processDropzone() }
-            .onFailure {
-                AppLogger.warning(TAG, "[Dropzone] processing failed (ignored): ${it.message}")
-            }
+        // [T-stage5-plugin-dropzone] Hot-load pass moved to the top of
+        // buildSystemPrompt (see pendingDropzoneNotice) — one call site for
+        // every send path, plus a user-visible notice when it did something.
         skillRepository?.reloadFromDisk()
         val skillFragment = skillRepository?.skillPromptFragment(activeSessionId)
         // [T-mcp-integration-android] Re-read servers.json (the CLI / file

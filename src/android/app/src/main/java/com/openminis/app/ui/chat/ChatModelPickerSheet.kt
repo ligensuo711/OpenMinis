@@ -5,6 +5,7 @@ package com.openminis.app.ui.chat
 // copied from ChatScreen.kt (unused imports are warnings, not errors);
 // ModelPickerSheet flipped private->internal so ChatScreen can call it.
 
+import com.openminis.app.ui.theme.SemanticColors
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -616,7 +617,7 @@ internal fun ModelPickerSheet(
                                     Icon(
                                         if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color(0xFF34C759)
+                                        tint = if (isSelected) SemanticColors.success
                                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                         modifier = Modifier.size(22.dp),
                                     )
@@ -632,7 +633,7 @@ internal fun ModelPickerSheet(
                                     Icon(
                                         Icons.Default.Layers,
                                         contentDescription = null,
-                                        tint = Color(0xFF007AFF),
+                                        tint = SemanticColors.accent,
                                         modifier = Modifier.size(18.dp),
                                     )
                                     Spacer(Modifier.width(10.dp))
@@ -712,10 +713,10 @@ internal fun ModelPickerSheet(
                                             fontSize = 9.sp,
                                             lineHeight = 11.sp,
                                             fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF007AFF),
+                                            color = SemanticColors.accent,
                                             modifier = Modifier
                                                 .background(
-                                                    Color(0xFF007AFF).copy(alpha = 0.1f),
+                                                    SemanticColors.accent.copy(alpha = 0.1f),
                                                     RoundedCornerShape(50),
                                                 )
                                                 .padding(horizontal = 5.dp, vertical = 1.dp),
@@ -823,7 +824,7 @@ internal fun ModelPickerSheet(
                                                 Icon(
                                                     if (isActive) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                                                     contentDescription = null,
-                                                    tint = if (isActive) Color(0xFF007AFF)
+                                                    tint = if (isActive) SemanticColors.accent
                                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
                                                     modifier = Modifier.size(17.dp),
                                                 )
@@ -863,10 +864,10 @@ internal fun ModelPickerSheet(
                                                         fontSize = 9.sp,
                                                         lineHeight = 11.sp,
                                                         fontWeight = FontWeight.Medium,
-                                                        color = Color(0xFF34C759),
+                                                        color = SemanticColors.success,
                                                         modifier = Modifier
                                                             .background(
-                                                                Color(0xFF34C759).copy(alpha = 0.1f),
+                                                                SemanticColors.success.copy(alpha = 0.1f),
                                                                 RoundedCornerShape(50),
                                                             )
                                                             .padding(horizontal = 5.dp, vertical = 1.dp),
@@ -1006,7 +1007,7 @@ internal fun ModelPickerSheet(
                                             Icon(
                                                 if (selectedEntry != null) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                                                 contentDescription = null,
-                                                tint = if (selectedEntry != null) Color(0xFF007AFF)
+                                                tint = if (selectedEntry != null) SemanticColors.accent
                                                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                                 modifier = Modifier.size(20.dp),
                                             )
@@ -1092,7 +1093,7 @@ internal fun ModelPickerSheet(
                                                 Icons.Default.KeyboardArrowDown,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(16.dp),
-                                                tint = Color(0xFF007AFF),
+                                                tint = SemanticColors.accent,
                                             )
                                             Spacer(Modifier.width(4.dp))
                                             Text(
@@ -1102,7 +1103,7 @@ internal fun ModelPickerSheet(
                                                     entries.size,
                                                 ),
                                                 style = MaterialTheme.typography.labelMedium,
-                                                color = Color(0xFF007AFF),
+                                                color = SemanticColors.accent,
                                             )
                                         }
                                         }
@@ -1133,7 +1134,7 @@ internal fun ModelPickerSheet(
                                             Icon(
                                                 if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                                                 contentDescription = null,
-                                                tint = if (isSelected) Color(0xFF007AFF)
+                                                tint = if (isSelected) SemanticColors.accent
                                                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                                 modifier = Modifier.size(20.dp),
                                             )
@@ -1174,10 +1175,10 @@ internal fun ModelPickerSheet(
                                                     fontSize = 9.sp,
                                                     lineHeight = 11.sp,
                                                     fontWeight = FontWeight.Medium,
-                                                    color = Color(0xFF34C759),
+                                                    color = SemanticColors.success,
                                                     modifier = Modifier
                                                         .background(
-                                                            Color(0xFF34C759).copy(alpha = 0.1f),
+                                                            SemanticColors.success.copy(alpha = 0.1f),
                                                             RoundedCornerShape(50),
                                                         )
                                                         .padding(horizontal = 5.dp, vertical = 1.dp),
@@ -1279,7 +1280,7 @@ private fun QuickTestButton(onClick: () -> Unit) {
         Icon(
             Icons.Default.Bolt,
             contentDescription = stringResource(R.string.model_picker_quick_test),
-            tint = Color(0xFF007AFF),
+            tint = SemanticColors.accent,
             modifier = Modifier.size(17.dp),
         )
     }
