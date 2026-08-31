@@ -1,6 +1,7 @@
 package com.openminis.app.data.repository
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -35,13 +36,13 @@ class DropzonePlannerTest {
     }
 
     @Test
-    fun `directory with SKILL.md is planned for adoption`() {
+    fun `directory with SKILL_MD is planned for adoption`() {
         val actions = DropzonePlanner.plan(listOf(entry("bilibili-hub", dir = true, skillMd = true)))
         assertEquals(listOf(DropzonePlanner.Action.AdoptDirectory("bilibili-hub")), actions)
     }
 
     @Test
-    fun `directory without SKILL.md is skipped not deleted`() {
+    fun `directory without SKILL_MD is skipped not deleted`() {
         val actions = DropzonePlanner.plan(listOf(entry("still-copying", dir = true, skillMd = false)))
         assertEquals(
             listOf(DropzonePlanner.Action.Skip("still-copying", "directory without SKILL.md (possibly mid-copy)")),
