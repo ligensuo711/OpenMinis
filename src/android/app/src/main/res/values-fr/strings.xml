@@ -1768,4 +1768,26 @@
     <string name="chat_input_placeholder_hint_5">Minis peut régler la touche ↩︎ sur envoyer ou saut de ligne</string>
     <string name="compact_progress">Compactage… %1$d s écoulées</string>
     <string name="compact_progress_split">Compactage… %1$d s · résumé par segments (%2$d/%3$d)</string>
+    <string name="shizuku_install_btn_sui">Installer Sui</string>
+    <string name="shizuku_install_btn_sui_subtitle">RikkaApps · pour appareils rootés (Magisk/KernelSU) · sans app, survit aux redémarrages</string>
+    <string name="shizuku_ready_subtitle_sui">Sui (root) · version=%1$d, uid=%2$d</string>
+    <string name="shizuku_grant_footer_sui">Sui est actif. Touchez « Autoriser Minis » pour accorder l\'accès — Sui affichera lui-même la boîte de dialogue. Il n\'y a pas d\'app de gestion distincte à ouvrir.</string>
+    <string name="shizuku_install_footer">Installez au choix Shizuku (RikkaApps), AXManager (Axeron) ou Sui (RikkaApps) — les trois utilisent le même protocole et sont interchangeables. Shizuku et AXManager sont des applications activées via ADB sans fil. Sui s\'adresse aux appareils déjà rootés : il s\'installe comme module Magisk/KernelSU, ne nécessite aucune app et reste actif après redémarrage. Sur KernelSU ou APatch, Sui exige en plus une implémentation Zygisk (Zygisk Next / ReZygisk / NeoZygisk) — sans elle, Sui ne se charge pas. Installez-en un, puis revenez ici.</string>
+    <string name="shizuku_state_not_installed_subtitle">Installez Shizuku, AXManager ou Sui — l\'un des trois suffit.</string>
+    <!-- [T-stage5-self-improvement] + [T-memory-graph] locale additions -->
+    <string name="memory_graph_header">Visualisation</string>
+    <string name="memory_graph_open">Graphe de mémoire</string>
+    <string name="memory_graph_subtitle">Voyez comment les souvenirs se connectent par des termes communs</string>
+    <string name="self_improvement_title">Auto-amélioration</string>
+    <string name="self_improvement_section_header">Leçon manuelle</string>
+    <string name="self_improvement_section_footer">Les leçons sont extraites automatiquement des appels d’outils ayant échoué puis récupérés dans la même session. Les meilleures leçons sont injectées dans le prompt système ; basculez pour exclure, supprimez pour retirer définitivement.</string>
+    <string name="self_improvement_add_placeholder">Ajouter une leçon manuellement…</string>
+    <string name="self_improvement_add_button">Ajouter</string>
+    <string name="self_improvement_empty_title">Aucune leçon pour le moment</string>
+    <string name="self_improvement_empty_description">Quand un appel d’outil échoue puis réussit à la nouvelle tentative, la récupération est consignée ici et réutilisée dans les sessions futures.</string>
+    <string name="self_improvement_hits_format">Observé %1$d fois</string>
+    <string name="self_improvement_manual_tag">Saisie manuelle</string>
+    <string name="self_improvement_delete">Supprimer la leçon</string>
+    <string name="self_improvement_open">Leçons (auto-amélioration)</string>
+    <string name="self_improvement_entry_subtitle">Leçons extraites automatiquement des appels d’outils échoués puis récupérés</string>
 </resources>

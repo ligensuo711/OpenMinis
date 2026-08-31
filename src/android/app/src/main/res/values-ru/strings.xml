@@ -1776,4 +1776,24 @@
     <string name="chat_input_placeholder_hint_5">Minis может назначить клавише ↩︎ отправку или перенос строки</string>
     <string name="compact_progress">Сжатие… прошло %1$d с</string>
     <string name="compact_progress_split">Сжатие… %1$d с · сводка по частям (%2$d/%3$d)</string>
+    <string name="shizuku_install_btn_sui">Установить Sui</string>
+    <string name="shizuku_install_btn_sui_subtitle">RikkaApps · для устройств с root (Magisk/KernelSU) · без приложения, работает после перезагрузки</string>
+    <string name="shizuku_ready_subtitle_sui">Sui (root) · версия=%1$d, uid=%2$d</string>
+    <string name="shizuku_grant_footer_sui">Sui запущен. Нажмите «Авторизовать Minis», чтобы предоставить доступ — Sui сам покажет диалог подтверждения. Отдельного приложения-менеджера открывать не нужно.</string>
+    <!-- [T-stage5-self-improvement] + [T-memory-graph] locale additions -->
+    <string name="memory_graph_header">Визуализация</string>
+    <string name="memory_graph_open">Граф памяти</string>
+    <string name="memory_graph_subtitle">Посмотрите, как воспоминания связаны общими терминами</string>
+    <string name="self_improvement_title">Самосовершенствование</string>
+    <string name="self_improvement_section_header">Ручной урок</string>
+    <string name="self_improvement_section_footer">Уроки автоматически извлекаются из паттернов «вызов инструмента не удался, затем восстановился» в рамках одной сессии. Лучшие уроки внедряются в системный промпт; переключатель исключает урок, удаление убирает навсегда.</string>
+    <string name="self_improvement_add_placeholder">Добавить урок вручную…</string>
+    <string name="self_improvement_add_button">Добавить</string>
+    <string name="self_improvement_empty_title">Уроков пока нет</string>
+    <string name="self_improvement_empty_description">Когда вызов инструмента завершается ошибкой, а повторная попытка удаётся, восстановление фиксируется здесь и используется в будущих сессиях.</string>
+    <string name="self_improvement_hits_format">Наблюдалось %1$d раз</string>
+    <string name="self_improvement_manual_tag">Ручная запись</string>
+    <string name="self_improvement_delete">Удалить урок</string>
+    <string name="self_improvement_open">Уроки (самосовершенствование)</string>
+    <string name="self_improvement_entry_subtitle">Уроки, автоматически извлечённые из восстановленных после сбоя вызовов инструментов</string>
 </resources>

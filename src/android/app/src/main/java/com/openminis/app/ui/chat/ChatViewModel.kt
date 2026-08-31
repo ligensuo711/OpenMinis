@@ -498,28 +498,36 @@ class ChatViewModel(
 
     /**
      * [T-stage5-dropzone-visibility] Stage 5.1 — 由 buildSystemPrompt 暂存、
-     * 发送流 flush 的 dropzone 报告。appendSystemInfo 在 IO 协程里跑也可
-     * （内部只做 _messages.value 更新，无 @Composable），但更新顺序必须
-     * 在流开始前，否则系统通知会夹进流式块中间。
+     * 发送流 flush 的 dropzone 报告队列。用 LIST 而非单值：drainQueuedPrompts
+     * 连发多条时每条 prompt 都会跑一次 buildSystemPrompt，单值字段会让前一次
+     * 的报告被覆盖吞掉（审查 P2-1）。append/flush 均在发送路径顺序执行，
+     * _isStreaming 门禁保证无并发循环。
      */
     @Volatile
-    private var pendingDropzoneNotice:
-        com.openminis.app.data.repository.SkillRepository.DropzoneReport? = null
+    private val pendingDropzoneNotices =
+        java.util.Collections.synchronizedList(
+            mutableListOf<com.openminis.app.data.repository.SkillRepository.DropzoneReport>()
+        )
 
-    /** 消费 [pendingDropzoneNotice]，转成聊天流系统通知。 */
+    /** 消费 [pendingDropzoneNotices]，转成聊天流系统通知。 */
     private fun flushDropzoneNoticeIfNeeded() {
-        val report = pendingDropzoneNotice ?: return
-        pendingDropzoneNotice = null
-        if (!report.hasActivity) return
-        val lines = buildList {
+        if (pendingDropzoneNotices.isEmpty()) return
+        val reports = synchronized(pendingDropzoneNotices) {
+            val copy = pendingDropzoneNotices.toList()
+            pendingDropzoneNotices.clear()
+            copy
+        }
+        val lines = mutableListOf<String>()
+        for (report in reports) {
+            if (!report.hasActivity) continue
             if (report.importedZips.isNotEmpty()) {
-                add("Skill pack imported: " + report.importedZips.joinToString(", "))
+                lines.add("Skill pack imported: " + report.importedZips.joinToString(", "))
             }
             if (report.adoptedDirs.isNotEmpty()) {
-                add("Skill folder adopted: " + report.adoptedDirs.joinToString(", "))
+                lines.add("Skill folder adopted: " + report.adoptedDirs.joinToString(", "))
             }
             if (report.failed.isNotEmpty()) {
-                add("Skill import failed (moved to skills-inbox/failed/): " +
+                lines.add("Skill import failed (moved to skills-inbox/failed/): " +
                     report.failed.joinToString(", "))
             }
         }
@@ -10418,7 +10426,7 @@ class ChatViewModel(
         runCatching { skillRepository?.processDropzone() }
             .onSuccess { report ->
                 if (report != null && report.hasActivity) {
-                    pendingDropzoneNotice = report
+                    pendingDropzoneNotices.add(report)
                 }
             }
             .onFailure {
