@@ -74,12 +74,44 @@ fun MemoryManagementScreen(
     var globalMemoryOn by remember {
         mutableStateOf(com.openminis.app.data.MemoryGlobalPrefs.isGlobalEnabled(context))
     }
+    // [T-memory-graph] Stage 3.2 — graph visualisation toggle.
+    var showGraph by remember { mutableStateOf(false) }
+    // [T-stage5-self-improvement] Stage 5.2 — lessons management toggle.
+    var showLessons by remember { mutableStateOf(false) }
+
+    if (showGraph) {
+        MemoryGraphScreen(memoryRepository = memoryRepository, onBack = { showGraph = false })
+        return
+    }
+    if (showLessons) {
+        SelfImprovementScreen(onBack = { showLessons = false })
+        return
+    }
 
     LaunchedEffect(Unit) {
         files = memoryRepository.listAllFiles()
     }
 
     SettingsScaffold(title = stringResource(R.string.memory_title), onBack = onBack) {
+        // [T-memory-graph] Stage 3.2 — entry to the graph visualisation.
+        SettingsSection(header = stringResource(R.string.memory_graph_header)) {
+            SettingsRow(
+                title = stringResource(R.string.memory_graph_open),
+                subtitle = stringResource(R.string.memory_graph_subtitle),
+                onClick = { showGraph = true },
+            )
+            // [T-stage5-self-improvement] Stage 5.2 — lessons live next to
+            // the other memory-family artifacts (lessons.json sits in the
+            // same minis-global/memory/ directory).
+            SettingsRow(
+                title = stringResource(R.string.self_improvement_open),
+                subtitle = stringResource(R.string.self_improvement_entry_subtitle),
+                onClick = { showLessons = true },
+                showDivider = false,
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Always-visible global toggle — sits above the file list so the
         // user finds it whether or not any memory files exist yet.
         SettingsSection(

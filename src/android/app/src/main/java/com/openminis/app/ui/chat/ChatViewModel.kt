@@ -490,6 +490,13 @@ class ChatViewModel(
 
     private val mediaStore = com.openminis.app.data.storage.MediaStore(context)
 
+    // [T-stage5-self-improvement] Stage 5.2 — 自我改进闭环。进程级单例：
+    // agent loop（record）与 Settings 的 SelfImprovementScreen（管理）
+    // 共用同一实例，避免两份内存态对 lessons.json 互相覆盖。
+    internal val selfImprovementStore =
+        com.openminis.app.agent.SelfImprovementStore.get(context)
+
+
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
@@ -7523,6 +7530,11 @@ class ChatViewModel(
         // which previously slapped a fake "200 turns hit" error on every
         // ordinary completion.
         var loopExitedNormally = false
+        // [T-stage5-self-improvement] 本轮 runAgentLoop 的工具成败流水。
+        // 循环结束后交给 SelfImprovementStore.record() 提炼「失败→恢复」
+        // lesson；纯采集（每工具调用一条），提取/持久化都在循环外做，
+        // 不占循环内的关键路径。
+        val turnToolEvents = mutableListOf<com.openminis.app.agent.SelfImprovement.ToolEvent>()
         // [T-android-auto-compact-inloop] How many times the in-loop guard has
         // compacted during THIS runAgentLoop. Bounds compact-thrash: once the
         // cap is hit, a still-over-threshold history stops the turn rather than
@@ -8874,6 +8886,28 @@ class ChatViewModel(
                     errorMessage = errMsgForDetector,
                     toolCallId = id,
                 )
+                // [T-stage1-tool-budget] Register the result so an identical call
+                // later in THIS turn reuses it. Failures are deliberately not
+                // cached — a transient error (flaky curl, busy file) must stay
+                // retryable with the same arguments.
+                toolBudget.recordExecution(
+                    toolName = name,
+                    argsJson = argsStr,
+                    toolCallId = id,
+                    result = result.output,
+                    isError = !result.success,
+                )
+                // [T-stage5-self-improvement] 采集成败事件（签名归一化在
+                // SelfImprovement.signature 内完成：折叠空白/去换行/截断，
+                // 同时防 prompt 注入与重复 key）。
+                turnToolEvents.add(
+                    com.openminis.app.agent.SelfImprovement.ToolEvent(
+                        toolName = name,
+                        inputSignature = com.openminis.app.agent.SelfImprovement.signature(argsStr),
+                        succeeded = result.success,
+                        timestampMs = System.currentTimeMillis(),
+                    )
+                )
                 val outputForLLM = if (postRecord.level == Level.WARNING && postRecord.message != null) {
                     AppLogger.debug("ChatViewModel",
                         "appending loop-warning to tool result name=$name key=${postRecord.warningKey}")
@@ -9063,6 +9097,18 @@ class ChatViewModel(
                 // through to normal next-turn dispatch so the queue doesn't
                 // pin the loop indefinitely.
             }
+        }
+        // [T-stage5-self-improvement] 循环收尾：把本轮工具成败流水交给
+        // 自改进闭环。store 内部先 extract（只有「失败→同工具恢复成功」
+        // 才成 lesson）再 merge（跨会话去重累加）——无失败恢复的干净轮次
+        // 事件量为 O(1) 早退。runCatching：闭环挂了不能拖垮正常收尾。
+        if (turnToolEvents.isNotEmpty()) {
+            runCatching {
+                val added = selfImprovementStore.record(turnToolEvents)
+                if (added > 0) {
+                    AppLogger.info(TAG, "[SelfImprovement] +$added lesson(s) from this turn")
+                }
+            }.onFailure { AppLogger.warning(TAG, "[SelfImprovement] record failed (ignored): ${it.message}") }
         }
         // Two ways to leave the for-loop above:
         //   (a) `break` from the "no tool calls" happy-path → loopExitedNormally=true,
@@ -10493,6 +10539,16 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         // the file_write hook below) becomes visible on the very next user
         // turn instead of "after kill app". Cheap: loadAll is a SQLite
         // SELECT + listFiles, no network.
+        // [T-stage5-plugin-dropzone] Hot-load pass BEFORE the rescan: anything
+        // the user/agent dropped into minis-global/skills-inbox/ (zip 或含
+        // SKILL.md 的目录) is imported right here, so the fragment below —
+        // built from the same loadAll the import feeds — already sees it.
+        // runCatching: 收件箱是外部输入（坏 zip / 半拷贝目录），处理失败
+        // 绝不能打断本轮对话的 prompt 构建。
+        runCatching { skillRepository?.processDropzone() }
+            .onFailure {
+                AppLogger.warning(TAG, "[Dropzone] processing failed (ignored): ${it.message}")
+            }
         skillRepository?.reloadFromDisk()
         val skillFragment = skillRepository?.skillPromptFragment(activeSessionId)
         // [T-mcp-integration-android] Re-read servers.json (the CLI / file
@@ -10522,6 +10578,11 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                 "globalChars=${globalMemoryFragment?.length ?: 0} " +
                 "dailyChars=${dailyMemoryFragment?.length ?: 0}",
         )
+        // [T-stage5-self-improvement] Stage 5.2 — 自我改进闭环的注入点。
+        // 与 memory fragments 同受 memoryOn 门控：lessons 是行为类持久
+        // 状态，用户关掉 memory 时同样不该看到（对齐 skills/SOUL.md 不
+        // 门控、memory 门控的既有语义划分）。
+        val lessonsFragment = if (memoryOn) selfImprovementStore.promptFragment() else null
 
         return buildString {
             append(base)
@@ -10541,6 +10602,24 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                 append("\n\n")
                 append(dailyMemoryFragment)
             }
+            // [T-stage5-self-improvement] 放在 memory fragments 之后、
+            // integration fragment 之前 —— lessons 是「经验性指令」，层级
+            // 介于长期记忆与运行时配置之间。
+            if (lessonsFragment != null) {
+                append("\n\n")
+                append(lessonsFragment)
+            }
+            // GitHub 平台集成状态（动态尾：依赖 env 配置，放在 Runtime context
+            // 之前，不破坏上面的静态前缀缓存）。
+            val integrationFragment = buildIntegrationStatus()
+            if (integrationFragment != null) {
+                append("\n\n")
+                append(integrationFragment)
+            }
+            // [T-stage2-search] search_web 的引用规则。与工具定义同源
+            // （SearchProviders.CITATION_PROMPT），避免两处措辞漂移。
+            append("\n\n")
+            append(SearchProviders.CITATION_PROMPT)
             // Runtime context goes last so the prefix above stays byte-stable
             // across requests within the same day. Keep ordering deterministic
             // (date → tz → lang → model count) — any reorder defeats the cache.

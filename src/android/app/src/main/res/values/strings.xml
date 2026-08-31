@@ -756,6 +756,22 @@
     <string name="log_share_chooser">Share Log</string>
     <string name="log_share_all_chooser">Share Logs</string>
     <string name="memory_title">Memory</string>
+    <string name="memory_graph_header">Visualisation</string>
+    <string name="memory_graph_open">Memory Graph</string>
+    <string name="memory_graph_subtitle">See how memories connect by shared terms</string>
+    <!-- [T-stage5-self-improvement] Self-improvement loop lessons management -->
+    <string name="self_improvement_title">Self-Improvement</string>
+    <string name="self_improvement_section_header">Manual lesson</string>
+    <string name="self_improvement_section_footer">Lessons are auto-extracted from tool calls that failed and were then recovered in the same session. Top lessons are injected into the system prompt; toggle to exclude, delete to remove permanently.</string>
+    <string name="self_improvement_add_placeholder">Add a lesson manually…</string>
+    <string name="self_improvement_add_button">Add</string>
+    <string name="self_improvement_empty_title">No lessons yet</string>
+    <string name="self_improvement_empty_description">When a tool call fails and a later retry succeeds, the recovery is captured here and reused in future sessions.</string>
+    <string name="self_improvement_hits_format">%1$d× observed</string>
+    <string name="self_improvement_manual_tag">Manual entry</string>
+    <string name="self_improvement_delete">Delete lesson</string>
+    <string name="self_improvement_open">Lessons (Self-Improvement)</string>
+    <string name="self_improvement_entry_subtitle">Auto-extracted lessons from failed-then-recovered tool calls</string>
     <string name="settings_memory_global_header">Default</string>
     <string name="settings_memory_global_footer">Per-session toggles (set via the /memory slash command or the Session Memory sheet) override this default. Existing sessions are not affected when you flip this switch.</string>
     <string name="settings_memory_global_enabled_title">Memory enabled by default</string>
@@ -880,7 +896,7 @@
     <string name="skill_title">Skills</string>
     <string name="skill_add">Add Skill</string>
     <string name="skill_section_installed">Installed</string>
-    <string name="skill_section_footer">Skills extend the Minis Agent with specialized instructions and workflows. They are loaded into the system prompt when enabled.</string>
+    <string name="skill_section_footer">Skills extend the AI agent with specialized instructions and workflows. They are loaded into the system prompt when enabled. Hot-load: drop a skill .zip (or a folder with SKILL.md) into /var/minis/skills-inbox/ — it is imported automatically on the next message.</string>
     <string name="skill_empty_title">No Skills Installed</string>
     <string name="skill_empty_action">Tap + to import a SKILL.md, .zip, or .skill file, or browse Minis Skills.</string>
     <string name="skill_import_modal_title">Import Skill</string>

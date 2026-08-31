@@ -193,7 +193,11 @@ object PRootKernel {
         // [T-mcp-integration-android] mcp-servers is global (like memory/skills):
         // binding it here makes the in-PRoot minis-mcp-cli read/write the SAME
         // servers.json the Android Settings UI does (host: minis-global/mcp-servers).
-        listOf("memory", "skills", "shared", "mcp-servers").forEach { subdir ->
+        // [T-stage5-plugin-dropzone] skills-inbox is the hot-load dropzone:
+        // binding it lets the in-PRoot agent `unzip`/`git clone` a skill
+        // straight into /var/minis/skills-inbox and have it auto-imported on
+        // the next turn (SkillRepository.processDropzone).
+        listOf("memory", "skills", "shared", "mcp-servers", "skills-inbox").forEach { subdir ->
             val hostDir = File(globalBase, subdir).also { it.mkdirs() }
             bindMounts["/var/minis/$subdir"] = hostDir.absolutePath
         }

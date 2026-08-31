@@ -431,6 +431,110 @@ class SkillRepository(private val context: Context) {
      */
     fun skillMdPath(id: String): String = "/var/minis/skills/$id/SKILL.md"
 
+    // -- [T-stage5-plugin-dropzone] Plugin dropzone (hot-load inbox) --
+
+    /** 收件箱：用户/agent 把 .zip 或技能目录丢进来，下一轮对话自动导入。 */
+    private val dropzoneDir: File
+        get() = File(context.filesDir, "minis-global/skills-inbox")
+
+    class DropzoneReport {
+        val importedZips = mutableListOf<String>()
+        val adoptedDirs = mutableListOf<String>()
+        val failed = mutableListOf<String>()
+        val hasActivity: Boolean get() = importedZips.isNotEmpty() || adoptedDirs.isNotEmpty() || failed.isNotEmpty()
+    }
+
+    /**
+     * Process the dropzone inbox. Called from buildSystemPrompt each turn
+     * (before reloadFromDisk) so a skill dropped into
+     * `/var/minis/skills-inbox/` — by the user via a file manager, or by the
+     * agent itself via shell — is installed and visible to the model on the
+     * very next user turn. Cheap when idle: one listFiles on an empty dir.
+     *
+     * Zip handling moves the file to `imported/` or `failed/` after the
+     * attempt, so a broken archive can never spin forever. Directories with
+     * SKILL.md are renamed into skillsDir and picked up by loadAll's
+     * auto-discover pass; a name collision sends the directory to `failed/`
+     * untouched (never merged, never deleted).
+     */
+    fun processDropzone(): DropzoneReport {
+        val inbox = dropzoneDir
+        if (!inbox.isDirectory) return DropzoneReport()
+        val files = inbox.listFiles()
+        if (files == null || files.isEmpty()) return DropzoneReport()
+
+        val entries = files.map {
+            DropzonePlanner.InboxEntry(
+                name = it.name,
+                isDirectory = it.isDirectory,
+                hasSkillMd = File(it, "SKILL.md").isFile,
+                isZip = it.isFile && it.name.lowercase().endsWith(".zip"),
+            )
+        }
+        val report = DropzoneReport()
+        for (action in DropzonePlanner.plan(entries)) {
+            when (action) {
+                is DropzonePlanner.Action.ImportZip -> {
+                    val zip = File(inbox, action.fileName)
+                    val imported = runCatching {
+                        zip.inputStream().buffered().use { importFromArchive(it) }
+                    }.getOrNull()
+                    if (imported != null) {
+                        moveEntry(zip, DropzonePlanner.ARCHIVE_DONE_DIR)
+                        report.importedZips += "${action.fileName} → ${imported.id}"
+                        Log.i(TAG, "[Dropzone] imported zip ${action.fileName} as skill ${imported.id}")
+                    } else {
+                        moveEntry(zip, DropzonePlanner.ARCHIVE_FAILED_DIR)
+                        report.failed += action.fileName
+                        Log.w(TAG, "[Dropzone] zip import failed: ${action.fileName} (moved to failed/)")
+                    }
+                }
+                is DropzonePlanner.Action.AdoptDirectory -> {
+                    val src = File(inbox, action.dirName)
+                    val id = DropzonePlanner.sanitizeId(action.dirName)
+                    val dest = File(skillsDir, id)
+                    if (dest.exists()) {
+                        moveEntry(src, DropzonePlanner.ARCHIVE_FAILED_DIR)
+                        report.failed += "${action.dirName} (skill id '$id' already exists)"
+                        Log.w(TAG, "[Dropzone] adopt conflict: $id exists, moved ${action.dirName} to failed/")
+                    } else if (src.renameTo(dest)) {
+                        report.adoptedDirs += "$action.dirName → $id"
+                        Log.i(TAG, "[Dropzone] adopted skill dir ${action.dirName} as $id")
+                    } else {
+                        // rename 跨挂载点失败（罕见）：copy 兜底
+                        runCatching { dest.mkdirs(); src.copyRecursively(dest, overwrite = true); src.deleteRecursively() }
+                            .onSuccess {
+                                report.adoptedDirs += "$action.dirName → $id (copied)"
+                                Log.i(TAG, "[Dropzone] adopted (copy) ${action.dirName} as $id")
+                            }
+                            .onFailure {
+                                report.failed += "${action.dirName} (move failed: ${it.message})"
+                                Log.w(TAG, "[Dropzone] adopt failed for ${action.dirName}: ${it.message}")
+                            }
+                    }
+                }
+                is DropzonePlanner.Action.Skip -> Unit // 留在原地，绝不删
+            }
+        }
+        if (report.hasActivity) loadAll()
+        return report
+    }
+
+    /** 把处理完的收件箱条目挪进 imported/ 或 failed/ 存档子目录（防无限重试）。 */
+    private fun moveEntry(entry: File, archiveDirName: String) {
+        runCatching {
+            val archiveDir = File(dropzoneDir, archiveDirName).also { it.mkdirs() }
+            var dest = File(archiveDir, entry.name)
+            var n = 1
+            while (dest.exists()) dest = File(archiveDir, "${entry.nameWithoutExtension}-${n++}${if (entry.isDirectory) "" else ".${entry.extension}"}")
+            if (!entry.renameTo(dest)) {
+                dest.mkdirs()
+                entry.copyRecursively(dest, overwrite = true)
+                if (entry.isDirectory) entry.deleteRecursively() else entry.delete()
+            }
+        }
+    }
+
     // -- Import from Zip Archive --
 
     /**
