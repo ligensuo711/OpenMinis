@@ -503,7 +503,6 @@ class ChatViewModel(
      * 的报告被覆盖吞掉（审查 P2-1）。append/flush 均在发送路径顺序执行，
      * _isStreaming 门禁保证无并发循环。
      */
-    @Volatile
     private val pendingDropzoneNotices =
         java.util.Collections.synchronizedList(
             mutableListOf<com.openminis.app.data.repository.SkillRepository.DropzoneReport>()
