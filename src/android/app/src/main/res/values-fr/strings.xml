@@ -1768,12 +1768,6 @@
     <string name="chat_input_placeholder_hint_5">Minis peut régler la touche ↩︎ sur envoyer ou saut de ligne</string>
     <string name="compact_progress">Compactage… %1$d s écoulées</string>
     <string name="compact_progress_split">Compactage… %1$d s · résumé par segments (%2$d/%3$d)</string>
-    <string name="shizuku_install_btn_sui">Installer Sui</string>
-    <string name="shizuku_install_btn_sui_subtitle">RikkaApps · pour appareils rootés (Magisk/KernelSU) · sans app, survit aux redémarrages</string>
-    <string name="shizuku_ready_subtitle_sui">Sui (root) · version=%1$d, uid=%2$d</string>
-    <string name="shizuku_grant_footer_sui">Sui est actif. Touchez « Autoriser Minis » pour accorder l\'accès — Sui affichera lui-même la boîte de dialogue. Il n\'y a pas d\'app de gestion distincte à ouvrir.</string>
-    <string name="shizuku_install_footer">Installez au choix Shizuku (RikkaApps), AXManager (Axeron) ou Sui (RikkaApps) — les trois utilisent le même protocole et sont interchangeables. Shizuku et AXManager sont des applications activées via ADB sans fil. Sui s\'adresse aux appareils déjà rootés : il s\'installe comme module Magisk/KernelSU, ne nécessite aucune app et reste actif après redémarrage. Sur KernelSU ou APatch, Sui exige en plus une implémentation Zygisk (Zygisk Next / ReZygisk / NeoZygisk) — sans elle, Sui ne se charge pas. Installez-en un, puis revenez ici.</string>
-    <string name="shizuku_state_not_installed_subtitle">Installez Shizuku, AXManager ou Sui — l\'un des trois suffit.</string>
     <!-- [T-stage5-self-improvement] + [T-memory-graph] locale additions -->
     <string name="memory_graph_header">Visualisation</string>
     <string name="memory_graph_open">Graphe de mémoire</string>

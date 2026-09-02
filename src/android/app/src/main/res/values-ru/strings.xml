@@ -1776,10 +1776,6 @@
     <string name="chat_input_placeholder_hint_5">Minis может назначить клавише ↩︎ отправку или перенос строки</string>
     <string name="compact_progress">Сжатие… прошло %1$d с</string>
     <string name="compact_progress_split">Сжатие… %1$d с · сводка по частям (%2$d/%3$d)</string>
-    <string name="shizuku_install_btn_sui">Установить Sui</string>
-    <string name="shizuku_install_btn_sui_subtitle">RikkaApps · для устройств с root (Magisk/KernelSU) · без приложения, работает после перезагрузки</string>
-    <string name="shizuku_ready_subtitle_sui">Sui (root) · версия=%1$d, uid=%2$d</string>
-    <string name="shizuku_grant_footer_sui">Sui запущен. Нажмите «Авторизовать Minis», чтобы предоставить доступ — Sui сам покажет диалог подтверждения. Отдельного приложения-менеджера открывать не нужно.</string>
     <!-- [T-stage5-self-improvement] + [T-memory-graph] locale additions -->
     <string name="memory_graph_header">Визуализация</string>
     <string name="memory_graph_open">Граф памяти</string>
