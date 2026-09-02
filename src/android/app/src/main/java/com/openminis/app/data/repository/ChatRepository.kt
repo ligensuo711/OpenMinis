@@ -347,6 +347,11 @@ class ChatRepository(internal val dao: ChatDao) {
      * snapshot exists to fix, only scoped to one row instead of the whole
      * session.
      */
+    // [T-session-branching] fork: promote kept branch rows to trunk.
+    suspend fun promoteBranchMessages(messageIds: List<String>) {
+        messageIds.forEach { dao.promoteBranchMessage(it) }
+    }
+
     suspend fun appendMessage(
         sessionId: String,
         role: String,
@@ -354,6 +359,9 @@ class ChatRepository(internal val dao: ChatDao) {
         tokenUsage: String? = null,
         reasoningContent: String? = null,
         modelSnapshot: ModelAttributionSnapshot? = null,
+        // [T-session-branching] fork: branch rows (parent/branch ids).
+        parentId: String? = null,
+        branchId: String? = null,
     ): MessageEntity {
         val sortOrder = dao.nextSortOrder(sessionId)
         val now = System.currentTimeMillis()
@@ -381,6 +389,8 @@ class ChatRepository(internal val dao: ChatDao) {
             modelDisplayName = modelSnapshot?.displayName,
             providerType = modelSnapshot?.providerTypeRaw,
             providerInstanceId = modelSnapshot?.providerInstanceId,
+            parentId = parentId,
+            branchId = branchId,
         )
         dao.insertMessage(message)
         // [T-android-preview-flicker-toolresult] Only overwrite the preview

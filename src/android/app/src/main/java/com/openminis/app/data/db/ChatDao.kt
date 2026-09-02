@@ -306,6 +306,10 @@ interface ChatDao {
     // target tool_use — that's an UPDATE of an existing row, not a delete.
     @Query("UPDATE messages SET parts_json = :partsJson, updated_at = :updatedAt WHERE id = :id")
     suspend fun updateMessageParts(id: String, partsJson: String, updatedAt: Long = System.currentTimeMillis())
+    // [T-session-branching] Promote a branch row to trunk by clearing its
+    // parent_id / branch_id (fork feature — see MIGRATION_12_13).
+    @Query("UPDATE messages SET parent_id = NULL, branch_id = NULL WHERE id = :messageId")
+    suspend fun promoteBranchMessage(messageId: String)
 
     // [T-error-persist-android] Write/clear the terminal error sticker on a
     // specific message row by id. Used when the persisted DB id is known

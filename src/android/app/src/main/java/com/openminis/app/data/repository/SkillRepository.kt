@@ -1294,6 +1294,42 @@ class SkillRepository(private val context: Context) {
         loadAll()
     }
 
+    // [T-cloudflare-ops-fork] Fork-only: capability-tier resolution reads each
+    // skill's requirements.json (upstream 1.13 SkillRepository has no such
+    // loader — restored verbatim from the 1.12 fork for SkillIntegrationTier).
+    fun loadSkillRequirements(skillId: String): SkillRequirements? {
+        return try {
+            val reqFile = File(File(skillsDir, skillId), "requirements.json")
+            if (!reqFile.exists()) return null
+            val json = JSONObject(reqFile.readText())
+            SkillRequirements(
+                apk = json.optJSONArray("apk")?.let { arr ->
+                    (0 until arr.length()).map { arr.getString(it) }
+                } ?: emptyList(),
+                pip = json.optJSONArray("pip")?.let { arr ->
+                    (0 until arr.length()).map { arr.getString(it) }
+                } ?: emptyList(),
+                env = json.optJSONObject("env")?.let { obj ->
+                    obj.keys().asSequence().associate { key -> key to obj.getString(key) }
+                } ?: emptyMap(),
+                tiers = json.optJSONObject("tiers")?.let { obj ->
+                    obj.keys().asSequence().associate { key -> key to obj.getString(key) }
+                } ?: emptyMap(),
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "loadSkillRequirements($skillId): ${e.message}")
+            null
+        }
+    }
+
+    /** Decoded `requirements.json` of a skill (fork: capability tiers). */
+    data class SkillRequirements(
+        val apk: List<String> = emptyList(),
+        val pip: List<String> = emptyList(),
+        val env: Map<String, String> = emptyMap(),
+        val tiers: Map<String, String> = emptyMap(),
+    )
+
     // -- Internal --
 
     private fun loadAll() {

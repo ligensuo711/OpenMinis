@@ -39,7 +39,9 @@ import com.openminis.app.data.model.RoutingStrategy
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.model.ThinkingLevel
 import com.openminis.app.R
+import com.openminis.app.data.branching.BranchGraph
 import com.openminis.app.data.repository.ChatRepository
+import com.openminis.app.data.repository.EnvVarRepository
 import com.openminis.app.data.repository.MemoryRepository
 import com.openminis.app.data.repository.ProviderRepository
 import com.openminis.app.provider.ImageBudget
@@ -65,6 +67,8 @@ import com.openminis.app.service.SessionActivityTracker
 import com.openminis.app.service.SessionConcurrencyManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
