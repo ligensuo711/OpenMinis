@@ -128,8 +128,56 @@ object DatabaseVersionGuard {
 
     fun evaluate(context: Context): Decision {
         val onDisk = readOnDiskVersion(context) ?: return Decision.PROCEED
-        if (onDisk <= CODE_DB_VERSION) return Decision.PROCEED
+        if (onDisk <= CODE_DB_VERSION) {
+            // [T-fork-upgrade-path] A failed first launch may have left
+            // user_version at 13 while the messages table is missing columns
+            // (Room rolls back the version on failure, but a half-applied
+            // migration from an earlier attempt can persist DDL without the
+            // version bump — see the MIGRATION_12_13 comment). Probe the
+            // actual column set and heal before Room's validator runs.
+            runCatching { healMessagesColumnsIfMissing(context) }
+            return Decision.PROCEED
+        }
         if (isHandledDowngrade(onDisk)) return Decision.PROCEED
         return Decision.SHOW_NEWER_DB_GUIDANCE
+    }
+
+    /**
+     * [T-fork-upgrade-path] Ensure the messages table carries every column
+     * the v13 entity declares, regardless of which migration path put the
+     * database at its current version. Uses raw SQLite (not Room) so this
+     * runs before Room is ever asked to open the file. Idempotent: existing
+     * columns make the ALTER throw inside runCatching and are skipped.
+     */
+    private fun healMessagesColumnsIfMissing(context: Context) {
+        val file = context.getDatabasePath(DB_NAME)
+        if (!file.exists()) return
+        val db = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE)
+        db.use { sqlite ->
+            val cols = mutableListOf<String>()
+            sqlite.rawQuery("PRAGMA table_info(messages)", null).use { c ->
+                val idx = c.getColumnIndex("name")
+                while (c.moveToNext()) cols.add(c.getString(idx))
+            }
+            fun addIfMissing(col: String) {
+                if (col !in cols) {
+                    sqlite.execSQL("ALTER TABLE messages ADD COLUMN $col TEXT")
+                    AppLogger.warning(TAG, "heal: added missing column $col")
+                }
+            }
+            addIfMissing("model_id")
+            addIfMissing("model_display_name")
+            addIfMissing("provider_type")
+            addIfMissing("provider_instance_id")
+            addIfMissing("parent_id")
+            addIfMissing("branch_id")
+            // Entity-declared indices (validation checks these too).
+            sqlite.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_messages_parent_id ON messages(parent_id)"
+            )
+            sqlite.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_messages_branch_id ON messages(branch_id)"
+            )
+        }
     }
 }

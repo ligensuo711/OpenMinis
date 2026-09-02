@@ -256,14 +256,31 @@ abstract class AppDatabase : RoomDatabase() {
          * [T-session-branching] Session branch comparison (stage 3.3).
          * Upstream 1.13 took 12 for the token-attribution columns, so our
          * branching migration is renumbered 12 → 13 (was 11 → 12 in the
-         * 1.12 fork). Adds `messages.parent_id` + `messages.branch_id`,
-         * both nullable. Purely additive: existing rows read back NULL
-         * (trunk). Idempotent on purpose — Room runs migrations outside a
-         * transaction, so a prior failed run may already have persisted
-         * the DDL; guard the ALTERs, CREATE INDEX is already IF NOT EXISTS.
+         * 1.12 fork).
+         *
+         * [T-fork-upgrade-path] A 1.12-fork install upgrading over the top
+         * has a v12 database whose 11→12 was OUR branching migration — the
+         * four attribution columns (model_id etc.) were NEVER added on that
+         * device. Upstream-1.13 installs, by contrast, have them from the
+         * upstream 11→12. Both must converge on the same v13 shape, so this
+         * migration adds BOTH sets, each guarded by runCatching for
+         * idempotence (Room runs migrations outside a transaction; a prior
+         * failed run may already have persisted some of the DDL).
+         * Without the attribution ALTERs, fork-upgrade devices crash at
+         * Room's post-migration entity validation ("Migration didn't
+         * properly handle" — missing columns), which is exactly the
+         * launch-loop users hit.
          */
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // Attribution set (present on upstream-1.13 upgrades, missing
+                // on 1.12-fork upgrades).
+                runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN model_id TEXT") }
+                runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN model_display_name TEXT") }
+                runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN provider_type TEXT") }
+                runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN provider_instance_id TEXT") }
+                // Branching set (present on 1.12-fork upgrades, missing on
+                // upstream-1.13 upgrades).
                 runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN parent_id TEXT") }
                 runCatching { db.execSQL("ALTER TABLE messages ADD COLUMN branch_id TEXT") }
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_parent_id ON messages(parent_id)")

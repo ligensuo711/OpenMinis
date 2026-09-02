@@ -237,7 +237,7 @@
           {
             "name": "index_messages_parent_id",
             "unique": false,
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_messages` ON `messages` (`parent_id`)",
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_parent_id` ON `${TABLE_NAME}` (`parent_id`)",
             "tableName": "messages",
             "columnNames": [
               "parent_id"
@@ -246,7 +246,7 @@
           {
             "name": "index_messages_branch_id",
             "unique": false,
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_messages` ON `messages` (`branch_id`)",
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_branch_id` ON `${TABLE_NAME}` (`branch_id`)",
             "tableName": "messages",
             "columnNames": [
               "branch_id"
