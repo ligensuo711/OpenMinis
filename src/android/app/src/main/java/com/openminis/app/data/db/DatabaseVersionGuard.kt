@@ -50,7 +50,7 @@ object DatabaseVersionGuard {
      * agree, so they cannot drift apart silently — a stale copy here would
      * either disable the guard or trip it on every launch.
      */
-    const val CODE_DB_VERSION = 12
+    const val CODE_DB_VERSION = 13
 
     /** Filename must match the one passed to `Room.databaseBuilder`. */
     private const val DB_NAME = "minis.db"
@@ -109,7 +109,10 @@ object DatabaseVersionGuard {
      * them a crash.
      */
     fun isHandledDowngrade(onDiskVersion: Int): Boolean =
-        onDiskVersion == 12 && CODE_DB_VERSION == 11
+        // [T-session-branching] fork bump: 13→12 keeps the branching columns
+        // in place (same rationale as the 12→11 no-op upstream).
+        (onDiskVersion == 13 && CODE_DB_VERSION == 12) ||
+            (onDiskVersion == 12 && CODE_DB_VERSION == 11)
 
     /** Result of the launch-time check. */
     enum class Decision {

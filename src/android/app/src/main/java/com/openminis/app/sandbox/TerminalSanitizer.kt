@@ -59,9 +59,15 @@ object TerminalSanitizer {
 
     /**
      * Simulate CR (\r) behavior: when a line contains \r (without \n),
-     * the text after \r overwrites from the beginning of the line.
-     * Each \r resets the cursor to position 0, so only the last segment's
-     * content (up to its length) is visible.
+     * the cursor returns to column 0 and subsequent text OVERWRITES the
+     * existing characters one by one — it does not discard the rest of the
+     * line. `"AAAA\rBB"` therefore renders as `"BBAA"`, matching a real
+     * terminal, not `"BB"`.
+     *
+     * [T-cr-fold-overwrite] The previous implementation kept only the last
+     * non-empty segment, which silently truncated any line whose earlier
+     * segment was longer (wget/curl progress bars, `apk` download counters).
+     * The model then read a shorter line than the terminal actually showed.
      */
     private fun foldCarriageReturns(text: String): String {
         val lines = text.split('\n')
@@ -75,13 +81,21 @@ object TerminalSanitizer {
                 continue
             }
 
-            // Split on CR and simulate overwriting.
-            // Each CR resets cursor to column 0. The last non-empty segment wins.
-            val segments = line.split('\r')
-            val lastNonEmpty = segments.lastOrNull { it.isNotEmpty() }
-            if (lastNonEmpty != null) {
-                result.append(lastNonEmpty)
+            // Each CR resets the cursor to column 0; the following segment
+            // overwrites in place, leaving any longer tail from a previous
+            // segment visible.
+            val canvas = StringBuilder()
+            for (segment in line.split('\r')) {
+                if (segment.isEmpty()) continue
+                for ((column, ch) in segment.withIndex()) {
+                    if (column < canvas.length) {
+                        canvas.setCharAt(column, ch)
+                    } else {
+                        canvas.append(ch)
+                    }
+                }
             }
+            result.append(canvas)
         }
 
         return result.toString()

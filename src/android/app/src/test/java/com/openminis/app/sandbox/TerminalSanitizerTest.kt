@@ -123,14 +123,20 @@ class TerminalSanitizerTest {
     @Test
     fun `sanitize strips ANSI after CR folding`() {
         val input = "\u001B[32mdownloading\u001B[0m\r\u001B[32mcomplete   \u001B[0m"
-        assertEquals("complete   ", TerminalSanitizer.sanitize(input))
+        // CR folding runs BEFORE ANSI stripping, so both segments still carry
+        // their escape codes and happen to be the same length (11 visible chars
+        // each) — the second fully overwrites the first. sanitize() then strips
+        // ANSI and ends with trim() by design (Pass 5), cutting the padding.
+        assertEquals("complete", TerminalSanitizer.sanitize(input))
     }
 
     @Test
     fun `sanitize handles real-world wget output`() {
         // wget progress: "  50%[=====>    ] 500K  --.-KB/s\r 100%[=========>] 1.0M  1.5MB/s"
         val input = "  50%[=====>    ]\r 100%[=========>]"
-        assertEquals(" 100%[=========>]", TerminalSanitizer.sanitize(input))
+        // Both segments are the same length, so the second fully overwrites the
+        // first; the leading space is removed by the trailing trim().
+        assertEquals("100%[=========>]", TerminalSanitizer.sanitize(input))
     }
 
     // ==================== truncateIfNeeded ====================
