@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.compose.foundation.lazy.LazyListState
 import com.openminis.app.agent.Level
+import com.openminis.app.agent.ToolExecutionBudget
 import com.openminis.app.agent.ToolLoopDetector
 import com.openminis.app.browser.BrowserActionInput
 import com.openminis.app.browser.BrowserTabPool
@@ -1300,6 +1301,8 @@ class ChatViewModel(
      * can't bleed warnings into a fresh prompt.
      */
     private val toolLoopDetector = ToolLoopDetector()
+    // [T-stage1-tool-budget] fork: same-turn tool-call dedupe.
+    private val toolBudget = ToolExecutionBudget()
 
     /**
      * Cached reference to the lazily-created [BrowserTabPool] so
@@ -9284,6 +9287,14 @@ class ChatViewModel(
             ReadImageTool.NAME -> executeReadImageTool(argsJson)
             "shell_execute" -> executeShellCommand(argsJson, toolId, toolBlocks, assistantId, currentText)
             "browser_use" -> executeBrowserUseTool(argsJson)
+            // [T-stage2-search] fork: structured web search (one call + cite:id).
+            "search_web" -> withContext(Dispatchers.IO) {
+                SearchTool.execute(argsJson, context)
+            }
+            // [T-stage2-rag] fork: local corpus BM25 relevance search.
+            "search_files" -> withContext(Dispatchers.IO) {
+                LocalSearchTool.execute(argsJson, activeSessionId, context)
+            }
             "memory_write" -> executeMemoryWriteTool(argsJson)
             "memory_get" -> executeMemoryGetTool(argsJson)
             else -> ToolExecutionResult("Unknown tool: $name", false)
@@ -10512,6 +10523,8 @@ Available tools:
 - file_read: Read file contents (faster than cat).
 - file_write: Create new files or overwrite existing files (faster than echo/tee).
 - file_edit: Edit existing files with exact string replacement (old_string → new_string). Preferred over file_write for modifications — always file_read first.
+- search_web: Structured web search. Prefer this over browser_use for "look something up" tasks — one call returns items[] (index / id / title / url / text) plus an optional pre-synthesized answer, instead of navigating a search engine and scraping. Use browser_use only when you must interact with a specific page (log in, click through, read content behind navigation). Cite what you use: append [cite:id] right after each statement a result supports.
+- search_files: Relevance search over the user's local files (/var/minis/workspace, /var/minis/shared, /var/minis/memory by default; pass path to narrow). Returns the most pertinent passages with path + line so you can file_read the full context. Prefer this over grepping via shell_execute for "where did I write about X" questions — grep cannot rank. Ranking is lexical, not semantic: if results look off, retry with different wording or synonyms.
 - browser_use: Web browsing (navigate, screenshot, click, type, get_text, scroll, scroll_and_collect, get_readable, get_backbone, fetch, etc.). Starts with a desktop Chrome user agent. Use screenshot to see the page.
   当 browser_use 触达 Google 登录 / OAuth 页（accounts.google.com、signin.google.com、myaccount.google.com、oauth2.googleapis.com 等）或网页返回 "disallowed_useragent" / 403 包含 "browser is not secure" 字样时，**不要重试或尝试登录** — Google 永久禁止 in-app WebView 完成登录，重试只会浪费 turn。改为告诉用户："此页面需要在系统 Chrome 完成登录" 并给出可点击的 Markdown link [在 Chrome 中打开](https://accounts.google.com/...)。点该 link 时 app 会跳出 Custom Tab；用户在 Chrome 完成操作后，请他**把所需结果（邮件正文 / 文档摘要 / 表格数据）粘贴回 chat**，你再继续帮他处理。这是 Android 平台限制，不是 bug。${toolListMemoryBullets}
 
