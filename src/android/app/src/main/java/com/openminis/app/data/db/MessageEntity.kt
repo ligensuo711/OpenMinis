@@ -70,4 +70,8 @@ data class MessageEntity(
     @ColumnInfo(name = "provider_type") val providerType: String? = null,
     /** Diagnostics / disambiguation only — the UI never resolves through it. */
     @ColumnInfo(name = "provider_instance_id") val providerInstanceId: String? = null,
+    // [T-session-branching] Branch columns (fork moved them to v13 — see
+    // MIGRATION_12_13). Trunk rendering filters these out.
+    @ColumnInfo(name = "parent_id") val parentId: String? = null,
+    @ColumnInfo(name = "branch_id") val branchId: String? = null,
 )
