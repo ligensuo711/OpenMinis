@@ -121,12 +121,15 @@ jobs:
           mkdir -p src/android/app/libs
           cp deps/build/rclone/rclone.aar src/android/app/libs/rclone.aar
 
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Build release APK
         env:
           GRADLE_OPTS: -Xmx6g -Dorg.gradle.jvmargs=-Xmx6g
         run: |
           cd src/android
-          ./gradlew :app:assembleRelease -x lint -x lintVitalRelease --no-daemon --stacktrace
+          ./gradlew :app:assembleRelease -x lint --no-daemon --stacktrace
 
       - name: Collect artifacts
         run: |
