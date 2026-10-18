@@ -1,13 +1,18 @@
 name: Android Beta Build
 
 # Builds the Android APK on GitHub's runners because the phone itself has no
-# Android SDK. Mirrors BUILDING.md step by step:
+# Android SDK. Mirrors BUILDING.md:
 #   native deps (proot + loaders, Alpine rootfs, rclone aar) -> Gradle.
 #
-# Signing: if the CI_KEYSTORE_* secrets are present the APK is signed with that
-# keystore, so it installs OVER an existing install with the same certificate
-# (an uninstall would wipe sessions, providers and the sandbox rootfs). With
-# the secrets absent the build falls back to upstream's debug signing.
+# NOTE on the SDK: ubuntu-24.04 ships Android cmdline-tools 16.0, and
+# android-actions/setup-android@v3 then tries to install the legacy "tools"
+# package, which no longer exists -> "Failed to find package 'tools'". We
+# therefore use the pre-installed SDK directly instead of that action.
+#
+# Signing: when the CI_KEYSTORE_* secrets are present the APK is signed with
+# that keystore so it installs OVER an existing install with the same
+# certificate (an uninstall would wipe sessions, providers and the sandbox
+# rootfs). Absent the secrets, the build falls back to debug signing.
 
 on:
   workflow_dispatch:
@@ -39,26 +44,51 @@ jobs:
       - name: Go (for gomobile/rclone)
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25.x'
+          go-version: '1.23'
           cache: false
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Resolve Android SDK
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "Using SDK at $SDK"
+          ls "$SDK" || true
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          if [ -d "$SDK/cmdline-tools/latest/bin" ]; then
+            echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          elif [ -d "$SDK/cmdline-tools/16.0/bin" ]; then
+            echo "$SDK/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
+          else
+            echo "cmdline-tools not found — installing"
+            mkdir -p "$SDK/cmdline-tools"
+            curl -sSLo /tmp/cmdline.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q /tmp/cmdline.zip -d "$SDK/cmdline-tools"
+            mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+            echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          fi
 
       - name: Install SDK packages
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager --install \
             "platforms;android-36" \
-            "build-tools;35.0.0" \
-            "ndk;28.0.12433" \
+            "build-tools;34.0.0" \
+            "ndk;28.0.12433566" \
             "cmake;3.22.1"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.0.12433566" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/28.0.12433566" >> "$GITHUB_ENV"
 
-      - name: Export build environment
+      - name: Export Go bin to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Provider customization placeholder
+        # The public tree only ships the .example template. Empty values
+        # compile fine, but anything touching the Claude OAuth path throws by
+        # design, so a CI-only placeholder keeps every code path reachable.
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.0.12433" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/28.0.12433" >> "$GITHUB_ENV"
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          cp src/android/app/provider-customization.properties.example src/android/app/provider-customization.properties
+          sed -i 's|^ANTHROPIC_OAUTH_IDENTIFIER_PROMPT=$|ANTHROPIC_OAUTH_IDENTIFIER_PROMPT=ci-placeholder-not-a-real-identifier|' src/android/app/provider-customization.properties
+          grep ANTHROPIC_OAUTH_IDENTIFIER_PROMPT src/android/app/provider-customization.properties
 
       - name: Decode signing keystore (optional)
         env:
@@ -70,27 +100,26 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/ks"
           printf '%s' "$CI_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ks/minis-release.jks"
-          echo "CI_KEYSTORE_PATH=$RUNNER_TEMP/ks/minis-release.jks" >> "$GITHUB_ENV"
-          printf 'CI_KEYSTORE_STORE_PW=%s\n' "$KS_STORE_PW" >> "$GITHUB_ENV"
-          printf 'CI_KEYSTORE_KEY_ALIAS=%s\n' "$KS_KEY_ALIAS" >> "$GITHUB_ENV"
-          printf 'CI_KEYSTORE_KEY_PW=%s\n' "$KS_KEY_PW" >> "$GITHUB_ENV"
+          {
+            echo "CI_KEYSTORE_PATH=$RUNNER_TEMP/ks/minis-release.jks"
+            printf 'CI_KEYSTORE_STORE_PW=%s\n' "$KS_STORE_PW"
+            printf 'CI_KEYSTORE_KEY_ALIAS=%s\n' "$KS_KEY_ALIAS"
+            printf 'CI_KEYSTORE_KEY_PW=%s\n' "$KS_KEY_PW"
+          } >> "$GITHUB_ENV"
 
       - name: Build proot + loaders
-        run: ./deps/build_proot.sh
+        run: bash deps/build_proot.sh
 
       - name: Prepare Alpine rootfs
-        run: ./scripts/prepare_android_sandbox.sh
-
-      - name: Install gomobile
-        run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          gomobile init
+        run: bash scripts/prepare_android_sandbox.sh
 
       - name: Build rclone AAR
         run: |
-          ./deps/build_rclone_android.sh
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+          bash deps/build_rclone_android.sh
           mkdir -p src/android/app/libs
-          cp deps/build/rclone/rclone.aar src/android/app/libs/
+          cp deps/build/rclone/rclone.aar src/android/app/libs/rclone.aar
 
       - name: Build release APK
         env:
@@ -98,6 +127,7 @@ jobs:
         run: |
           cd src/android
           ./gradlew :app:assembleRelease -x lint -x lintVitalRelease --no-daemon --stacktrace
+
       - name: Collect artifacts
         run: |
           mkdir -p out

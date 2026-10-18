@@ -36,7 +36,7 @@ android {
     // AGP picks its own default and the CMake native libs can be built with a
     // different toolchain than proot — the exact mismatch that produces
     // silent loader failures at runtime.
-    ndkVersion = "28.0.12433"
+    ndkVersion = "28.0.12433566"
 
     // [T-android-revprompt-ci] Optional CI signing identity.
     //
