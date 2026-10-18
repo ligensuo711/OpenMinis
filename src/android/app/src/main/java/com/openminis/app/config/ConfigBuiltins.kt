@@ -50,6 +50,7 @@ internal object ConfigBuiltins {
         registerProviderCollections(r, providerRepo, envVarRepo)
         registerDefaults(r, providerRepo)
         registerSoul(r, context)
+        registerReversePrompt(r, context)
         registerMemory(r, context)
         registerNetwork(r, context)
     }
@@ -1175,6 +1176,46 @@ internal object ConfigBuiltins {
                     }
                     val cur = loadCurrent()
                     saveCurrent(cur.copy(body = raw))
+                },
+            )
+        )
+    }
+
+    // -- Reverse engineering prompt (REVERSE_PROMPT.md) --
+
+    /**
+     * [T-android-reverse-prompt-minisconfig] Exposes the per-turn operating
+     * procedure as `reversePrompt.body`, so the agent can read it and — with
+     * the standard user approval gate — rewrite it without a UI round-trip.
+     * Contract matches `soul.body`: read returns the file verbatim, write
+     * replaces it wholesale.
+     *
+     * Deliberately NOT injection-scrubbed, unlike `soul.body`. That guard
+     * exists to keep the PERSONA free of instruction overrides; this field
+     * is nothing but instructions, so imperative text ("always verify the
+     * signature fingerprint first") is the intended content. The prompt
+     * label still states that the user's latest message outranks it.
+     */
+    private fun registerReversePrompt(r: ConfigRegistry, context: Context) {
+        r.register(
+            ClosureField(
+                path = "reversePrompt.body",
+                displayName = "Reverse engineering prompt",
+                description = "Markdown injected into the agent system prompt on EVERY turn (Settings > Reverse Engineering Prompt). Empty string switches injection off; longer than ${com.openminis.app.agent.ReversePromptStore.CHAR_LIMIT} chars is clipped at prompt-build time. Lives on disk at memory/REVERSE_PROMPT.md, so shell edits work too.",
+                valueSchema = ConfigSchema.Str(
+                    maxLength = com.openminis.app.agent.ReversePromptStore.CHAR_LIMIT,
+                ),
+                risk = ConfigRisk.SENSITIVE,
+                revertable = true,
+                reader = {
+                    ConfigValue.Str(
+                        com.openminis.app.agent.ReversePromptStore.load(context).orEmpty(),
+                    )
+                },
+                writer = { v ->
+                    val raw = (v as? ConfigValue.Str)?.value
+                        ?: throw ConfigError.TypeMismatch("string")
+                    com.openminis.app.agent.ReversePromptStore.save(context, raw)
                 },
             )
         )

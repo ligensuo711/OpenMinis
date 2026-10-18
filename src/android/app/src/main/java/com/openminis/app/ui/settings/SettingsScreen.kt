@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.Handyman
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -94,6 +95,9 @@ fun SettingsScreen(
     // Agent Runtime section; default no-op for callers that haven't wired
     // the route yet.
     onSoulClick: () -> Unit = {},
+    // [T-android-reverse-prompt] REVERSE_PROMPT.md editor, directly below
+    // Soul on iOS-parity ordering (identity, then working procedure).
+    onReversePromptClick: () -> Unit = {},
     onPermissionsClick: () -> Unit = {},
     onUsageClick: () -> Unit = {},
     onAppearanceClick: () -> Unit = {},
@@ -218,6 +222,17 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_soul),
                     subtitle = stringResource(R.string.settings_soul_subtitle),
                     onClick = onSoulClick,
+                )
+                // [T-android-reverse-prompt] Directly under Soul: identity
+                // first, then the per-turn working procedure. Same red gear
+                // glyph family as the reference mock, distinct from Soul's
+                // sparkle so the two editors are not confused at a glance.
+                SettingsItem(
+                    icon = Icons.Outlined.SettingsSuggest,
+                    iconColor = Color(0xFFFF3B30),
+                    title = stringResource(R.string.settings_reverse_prompt),
+                    subtitle = stringResource(R.string.settings_reverse_prompt_subtitle),
+                    onClick = onReversePromptClick,
                 )
                 SettingsItem(
                     icon = Icons.Outlined.Psychology,

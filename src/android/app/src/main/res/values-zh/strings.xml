@@ -247,6 +247,26 @@
     <string name="mcp_delete_message">这将从 servers.json 中移除该服务器。此操作无法撤销。</string>
     <string name="settings_soul">人格</string>
     <string name="settings_soul_subtitle">持久化人格与身份（SOUL.md）</string>
+    <!-- [T-android-reverse-prompt] REVERSE_PROMPT.md — 每回合注入的工作流 -->
+    <string name="settings_reverse_prompt">安卓逆向提示词</string>
+    <string name="settings_reverse_prompt_subtitle">每个 Agent 回合都会注入的可编辑工作流</string>
+    <string name="reverse_prompt_title">安卓逆向提示词</string>
+    <string name="reverse_prompt_section_about">说明</string>
+    <string name="reverse_prompt_intro">这段 Markdown 会在每个回合追加进 Agent 的系统提示。留空即关闭注入。</string>
+    <string name="reverse_prompt_file_path">文件：%1$s</string>
+    <string name="reverse_prompt_status_on">已启用 — 每回合注入</string>
+    <string name="reverse_prompt_status_off">已关闭 — 文件为空</string>
+    <string name="reverse_prompt_count">%1$d / %2$d 字符</string>
+    <string name="reverse_prompt_over_limit">超出上限 — 注入时会被截断。精简草稿才能让整份流程进入上下文。</string>
+    <string name="reverse_prompt_footer">以独立区块注入，位置在人格之后。用户最新一条消息始终优先于它。</string>
+    <string name="reverse_prompt_placeholder">描述 Agent 应该遵循的工作流程…</string>
+    <string name="reverse_prompt_save">保存</string>
+    <string name="reverse_prompt_cancel">取消</string>
+    <string name="reverse_prompt_saved">已保存 — 下一回合生效</string>
+    <string name="reverse_prompt_restore_default">恢复默认</string>
+    <string name="reverse_prompt_restore_confirm_title">恢复默认流程？</string>
+    <string name="reverse_prompt_restore_confirm_message">当前内容会被内置的安卓逆向流程覆盖。</string>
+    <string name="reverse_prompt_restore_confirm_action">恢复</string>
     <string name="soul_settings_title">人格</string>
     <string name="soul_section_preview">预览</string>
     <string name="soul_section_identity">身份</string>

@@ -606,7 +606,7 @@ object SystemPromptBuilder {
         val body = file?.body
         val trimmed = body?.trim().orEmpty()
         if (trimmed.isEmpty()) {
-            return identityTrimmed + styleBlock(style) + "\n\n" + soulEditHint + "\n\n"
+            return identityTrimmed + styleBlock(style) + "\n\n" + soulEditHint + "\n\n" + reversePromptSection(context)
         }
 
         // Reject (NOT truncate) bodies that exceed the language-aware
@@ -620,7 +620,7 @@ object SystemPromptBuilder {
         val check = SoulStore.isOverLimit(trimmed)
         if (check.isOverLimit) {
             AppLogger.warning(TAG, "personality body is over the language-aware limit ($check) — falling back to identity-only system prompt.")
-            return identityTrimmed + styleBlock(style) + "\n\n" + soulEditHint + "\n\n"
+            return identityTrimmed + styleBlock(style) + "\n\n" + soulEditHint + "\n\n" + reversePromptSection(context)
         }
 
         val personality = scrubInjections(trimmed)
@@ -633,7 +633,48 @@ object SystemPromptBuilder {
             styleBlock(style) +
             "\n\n" +
             soulEditHint +
-            "\n\n"
+            "\n\n" +
+            reversePromptSection(context)
+    }
+
+    /**
+     * [T-android-reverse-prompt] The user-authored operating procedure from
+     * REVERSE_PROMPT.md, rendered as its own labeled block right after the
+     * identity/hint section.
+     *
+     * Design notes:
+     *  - Placement is deliberate: after the persona block, before the static
+     *    tool catalogue. It therefore sits inside the byte-stable prefix that
+     *    OpenAI/DeepSeek prompt caching keys on — the block only changes when
+     *    the user edits the file, so cache hits survive across turns.
+     *  - The label states the precedence rule ("the user's latest message
+     *    wins") so a stale procedure can never outrank a live instruction.
+     *  - Blank / missing file returns "" — this is the feature's off switch,
+     *    with no separate preference to fall out of sync.
+     *  - Content is CLIPPED at [ReversePromptStore.CHAR_LIMIT], not rejected:
+     *    the procedure is injected on every request, and a runaway paste would
+     *    otherwise tax every single turn. The marker tells the model the tail
+     *    is missing, so it can ask instead of guessing.
+     */
+    fun reversePromptSection(context: Context): String {
+        val raw = try {
+            com.openminis.app.agent.ReversePromptStore.load(context)
+        } catch (t: Throwable) {
+            AppLogger.warning(TAG, "REVERSE_PROMPT.md load failed: ${t.message}")
+            null
+        } ?: return ""
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return ""
+        val body = if (trimmed.length > com.openminis.app.agent.ReversePromptStore.CHAR_LIMIT) {
+            AppLogger.warning(TAG, "REVERSE_PROMPT.md is over ${com.openminis.app.agent.ReversePromptStore.CHAR_LIMIT} chars — clipping")
+            trimmed.substring(0, com.openminis.app.agent.ReversePromptStore.CHAR_LIMIT) +
+                com.openminis.app.agent.ReversePromptStore.TRUNCATION_MARKER
+        } else {
+            trimmed
+        }
+        return "\n\nOperating procedure (from REVERSE_PROMPT.md — written by the user, injected on every turn; " +
+            "follow it whenever the task falls inside its scope, but the user's latest message overrides it):\n" +
+            body + "\n\n"
     }
 
     /**

@@ -1,0 +1,120 @@
+name: Android Beta Build
+
+# Builds the Android APK on GitHub's runners because the phone itself has no
+# Android SDK. Mirrors BUILDING.md step by step:
+#   native deps (proot + loaders, Alpine rootfs, rclone aar) -> Gradle.
+#
+# Signing: if the CI_KEYSTORE_* secrets are present the APK is signed with that
+# keystore, so it installs OVER an existing install with the same certificate
+# (an uninstall would wipe sessions, providers and the sandbox rootfs). With
+# the secrets absent the build falls back to upstream's debug signing.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [revprompt]
+
+concurrency:
+  group: android-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Go (for gomobile/rclone)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "ndk;28.0.12433" \
+            "cmake;3.22.1"
+
+      - name: Export build environment
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.0.12433" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/28.0.12433" >> "$GITHUB_ENV"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Decode signing keystore (optional)
+        env:
+          CI_KEYSTORE_B64: ${{ secrets.CI_KEYSTORE_B64 }}
+          KS_STORE_PW: ${{ secrets.CI_KEYSTORE_STORE_PW }}
+          KS_KEY_ALIAS: ${{ secrets.CI_KEYSTORE_KEY_ALIAS }}
+          KS_KEY_PW: ${{ secrets.CI_KEYSTORE_KEY_PW }}
+        if: ${{ env.CI_KEYSTORE_B64 != '' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ks"
+          printf '%s' "$CI_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ks/minis-release.jks"
+          echo "CI_KEYSTORE_PATH=$RUNNER_TEMP/ks/minis-release.jks" >> "$GITHUB_ENV"
+          printf 'CI_KEYSTORE_STORE_PW=%s\n' "$KS_STORE_PW" >> "$GITHUB_ENV"
+          printf 'CI_KEYSTORE_KEY_ALIAS=%s\n' "$KS_KEY_ALIAS" >> "$GITHUB_ENV"
+          printf 'CI_KEYSTORE_KEY_PW=%s\n' "$KS_KEY_PW" >> "$GITHUB_ENV"
+
+      - name: Build proot + loaders
+        run: ./deps/build_proot.sh
+
+      - name: Prepare Alpine rootfs
+        run: ./scripts/prepare_android_sandbox.sh
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+
+      - name: Build rclone AAR
+        run: |
+          ./deps/build_rclone_android.sh
+          mkdir -p src/android/app/libs
+          cp deps/build/rclone/rclone.aar src/android/app/libs/
+
+      - name: Build release APK
+        env:
+          GRADLE_OPTS: -Xmx6g -Dorg.gradle.jvmargs=-Xmx6g
+        run: |
+          cd src/android
+          ./gradlew :app:assembleRelease -x lint -x lintVitalRelease --no-daemon --stacktrace
+      - name: Collect artifacts
+        run: |
+          mkdir -p out
+          cp src/android/app/build/outputs/apk/release/*.apk out/ || true
+          ls -l out
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: minis-revprompt-apk
+          path: out/*.apk
+          if-no-files-found: error
+
+      - name: Upload native debug symbols
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: minis-native-symbols
+          path: src/android/app/build/outputs/native-debug-symbols/**/*.zip
+          if-no-files-found: ignore

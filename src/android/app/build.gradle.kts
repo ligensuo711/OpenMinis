@@ -31,6 +31,39 @@ android {
     // Android 16 behavior changes; the Live Updates path is runtime-gated on
     // Build.VERSION.SDK_INT >= 36 (see DynamicIslandSupport / AgentForegroundService).
     compileSdk = 36
+    // [T-android-revprompt-ci] Pin the NDK the build scripts were verified
+    // against (BUILDING.md requires r28+ for the proot fork). Without this,
+    // AGP picks its own default and the CMake native libs can be built with a
+    // different toolchain than proot — the exact mismatch that produces
+    // silent loader failures at runtime.
+    ndkVersion = "28.0.12433"
+
+    // [T-android-revprompt-ci] Optional CI signing identity.
+    //
+    // Upstream signs debug/perf/release with the auto-generated debug key,
+    // which is fine for a fresh install but forces an UNINSTALL to upgrade an
+    // existing install — and an uninstall wipes sessions, provider configs and
+    // the extracted Alpine rootfs. For a build produced by CI and installed
+    // over the user's daily driver, the certificate must match.
+    //
+    // When CI_KEYSTORE_PATH is set (GitHub Actions does this), the build signs
+    // with that keystore; with it absent, behaviour is byte-identical to
+    // upstream (debug signing). All four values come from the environment so
+    // no secret lands in the repository.
+    signingConfigs {
+        create("ci") {
+            val ksPath = System.getenv("CI_KEYSTORE_PATH")
+            if (!ksPath.isNullOrBlank()) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("CI_KEYSTORE_STORE_PW")
+                keyAlias = System.getenv("CI_KEYSTORE_KEY_ALIAS")
+                keyPassword = System.getenv("CI_KEYSTORE_KEY_PW")
+            }
+        }
+    }
+    val ciSigningConfigured = !System.getenv("CI_KEYSTORE_PATH").isNullOrBlank()
+    val appSigning = if (ciSigningConfigured) signingConfigs.getByName("ci")
+    else signingConfigs.getByName("debug")
 
     defaultConfig {
         applicationId = "com.openminis.app"
@@ -94,7 +127,7 @@ android {
             isProfileable = true
             matchingFallbacks += listOf("debug")
             buildConfigField("boolean", "DEV_TOOLS", "true")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = appSigning
         }
         release {
             // [OpenMinis#363] Produce native-debug-symbols.zip alongside the
@@ -116,7 +149,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = appSigning
         }
     }
 

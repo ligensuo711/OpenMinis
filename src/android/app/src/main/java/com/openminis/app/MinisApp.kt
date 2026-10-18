@@ -567,6 +567,14 @@ class MinisApp : Application(), ImageLoaderFactory {
         com.openminis.app.agent.SoulStore.ensureExists(this)
         com.openminis.app.agent.SoulStore.refreshCache(this)
 
+        // [T-android-reverse-prompt] Seed REVERSE_PROMPT.md (the per-turn
+        // operating procedure) on first launch, next to SOUL.md / GLOBAL.md.
+        // No-op once the user has edited it; deleting the file is a valid
+        // way to start over, so seeding is the useful default rather than
+        // an empty page the user has to discover.
+        com.openminis.app.agent.ReversePromptStore.ensureExists(this)
+        com.openminis.app.agent.ReversePromptStore.refreshCache(this)
+
         // T-config: minis-config CLI surface — registry / audit log /
         // master-switch store. Initialized eagerly here so
         // ConfigRegistry.get() is safe from any thread for the rest of

@@ -15091,7 +15091,12 @@ class ChatViewModel(
         // drift rule as the parent's browser bullet below).
         val browserToolEnabled = com.openminis.app.tools.AgentToolSwitch.BROWSER.isEnabled(context)
         val identitySection = helperConfig?.let {
-            com.openminis.app.agent.jobs.HelperRunner.identitySection(it, browserEnabled = browserToolEnabled)
+            // [T-android-reverse-prompt] A sub agent runs the same class of
+            // task (unpack / patch / verify), so it gets the user's procedure
+            // too. The parent already carries it inside identitySection();
+            // appending here only affects the helper path.
+            com.openminis.app.agent.jobs.HelperRunner.identitySection(it, browserEnabled = browserToolEnabled) +
+                com.openminis.app.agent.SystemPromptBuilder.reversePromptSection(context)
         }
             ?: com.openminis.app.agent.SystemPromptBuilder.identitySection(context)
         // [T-memory-toggle-gates-injection-and-tools-android] Mirror the iOS

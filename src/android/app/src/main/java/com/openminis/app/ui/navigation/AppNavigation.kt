@@ -623,6 +623,7 @@ fun AppNavigation(
                 onAgentToolsClick = { navController.safeNavigate(Routes.AGENT_TOOLS) },
                 onMcpClick = { navController.safeNavigate(Routes.MCP) },
                 onSoulClick = { navController.safeNavigate(Routes.SOUL) },
+                onReversePromptClick = { navController.safeNavigate(Routes.REVERSE_PROMPT) },
                 onPermissionsClick = { navController.safeNavigate(Routes.PERMISSIONS) },
                 onUsageClick = { navController.safeNavigate(Routes.USAGE_STATS) },
                 onAppearanceClick = { navController.safeNavigate(Routes.APPEARANCE) },
@@ -1362,6 +1363,14 @@ fun AppNavigation(
         // [T-soul-md] SOUL.md editor.
         composable(Routes.SOUL) {
             com.openminis.app.ui.settings.SoulSettingsScreen(
+                onBack = { navController.safePopBackStack() },
+            )
+        }
+
+        // [T-android-reverse-prompt] REVERSE_PROMPT.md editor — the procedure
+        // injected into every agent turn.
+        composable(Routes.REVERSE_PROMPT) {
+            com.openminis.app.ui.settings.ReversePromptSettingsScreen(
                 onBack = { navController.safePopBackStack() },
             )
         }

@@ -288,6 +288,26 @@
     <!-- T-soul-md — SOUL.md personality / identity settings -->
     <string name="settings_soul">Soul</string>
     <string name="settings_soul_subtitle">Persistent personality and identity (SOUL.md)</string>
+    <!-- [T-android-reverse-prompt] REVERSE_PROMPT.md — per-turn procedure -->
+    <string name="settings_reverse_prompt">Reverse Engineering Prompt</string>
+    <string name="settings_reverse_prompt_subtitle">Editable workflow injected into every agent turn</string>
+    <string name="reverse_prompt_title">Reverse Engineering Prompt</string>
+    <string name="reverse_prompt_section_about">About</string>
+    <string name="reverse_prompt_intro">This Markdown is appended to the agent system prompt on every turn. Leave it blank to switch the injection off.</string>
+    <string name="reverse_prompt_file_path">File: %1$s</string>
+    <string name="reverse_prompt_status_on">Active — injected on every turn</string>
+    <string name="reverse_prompt_status_off">Off — the file is empty</string>
+    <string name="reverse_prompt_count">%1$d / %2$d chars</string>
+    <string name="reverse_prompt_over_limit">Over the cap — the injected copy is clipped at the limit. Trim the draft to keep the whole procedure in context.</string>
+    <string name="reverse_prompt_footer">Injected as its own labeled block, right after the persona. The user\'s latest message always overrides it.</string>
+    <string name="reverse_prompt_placeholder">Describe the working procedure the agent should follow…</string>
+    <string name="reverse_prompt_save">Save</string>
+    <string name="reverse_prompt_cancel">Cancel</string>
+    <string name="reverse_prompt_saved">Saved — applies from the next turn</string>
+    <string name="reverse_prompt_restore_default">Restore Default</string>
+    <string name="reverse_prompt_restore_confirm_title">Restore default procedure?</string>
+    <string name="reverse_prompt_restore_confirm_message">This overwrites the current text with the built-in reverse-engineering workflow.</string>
+    <string name="reverse_prompt_restore_confirm_action">Restore</string>
     <string name="soul_settings_title">Soul</string>
     <string name="soul_section_preview">Preview</string>
     <string name="soul_section_identity">Identity</string>
