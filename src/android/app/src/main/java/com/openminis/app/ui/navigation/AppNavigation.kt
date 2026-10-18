@@ -177,6 +177,8 @@ object Routes {
     const val MCP = "mcp"
     /** [T-soul-md] SOUL.md editor. */
     const val SOUL = "soul"
+    /** [T-android-reverse-prompt] REVERSE_PROMPT.md editor (per-turn procedure). */
+    const val REVERSE_PROMPT = "reverse_prompt"
     const val MEMORY_FILE_EDIT = "memory_file/{fileName}/{isGlobal}"
     const val PERMISSIONS = "permissions"
     /**
