@@ -127,6 +127,10 @@ jobs:
       - name: Build release APK
         env:
           GRADLE_OPTS: -Xmx6g -Dorg.gradle.jvmargs=-Xmx6g
+          # Must be >= the versionCode already installed, otherwise the device
+          # rejects the upgrade (INSTALL_FAILED_VERSION_DOWNGRADE).
+          MINIS_VERSION_CODE: '34'
+          MINIS_VERSION_NAME: '1.15-beta.5'
         run: |
           cd src/android
           ./gradlew :app:assembleRelease -x lint --no-daemon --stacktrace

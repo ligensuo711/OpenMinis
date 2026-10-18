@@ -69,8 +69,17 @@ android {
         applicationId = "com.openminis.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 28
-        versionName = "1.14"
+        // [T-android-revprompt-ci] Version numbers are injectable at build time.
+        //
+        // Upstream tags `0-beta-buildNN` on the public mirror's main, whose
+        // versionName/versionCode lag the private build: tag 0-beta-build34 is
+        // labelled "Android 1.15-beta.5 (build 34)" while this file still said
+        // 1.14 / 28. Installing a build whose versionCode is LOWER than the one
+        // already on the device is refused with INSTALL_FAILED_VERSION_DOWNGRADE,
+        // so the release label has to be honoured here or the APK cannot
+        // upgrade an existing install at all.
+        versionCode = (System.getenv("MINIS_VERSION_CODE") ?: "34").toInt()
+        versionName = System.getenv("MINIS_VERSION_NAME") ?: "1.15-beta.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
